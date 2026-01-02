@@ -11,6 +11,27 @@ This protocol ensures that agents always operate within their defined constraint
 
 **V1.2 Update**: Introduces orientation files for faster onboarding with tiered loading.
 
+**V1.2.1 Update**: Clarifies that invocations provide context, not instructions. Agents determine their actions from their orientation files and authority documents.
+
+---
+
+## Core Principle: Context, Not Instructions
+
+**Invocations provide context. Agents determine actions.**
+
+When invoking an agent, the invocation should tell the agent:
+- **What state** exists (which plan, what happened, where to look)
+- **NOT what to do** (the agent reads its orientation to determine actions)
+
+The agent's orientation file defines its responsibilities. The agent reads authority documents to understand what actions are required. The invocation merely provides the context for the agent to apply its documented responsibilities.
+
+### Why This Matters
+
+1. **Single source of truth**: Agent responsibilities live in orientation files, not scattered across invocations
+2. **Consistency**: The same event always triggers the same response, regardless of who invokes
+3. **Auditability**: What an agent does is traceable to its documentation, not to ad-hoc instructions
+4. **Reduced errors**: No risk of forgetting steps when invoking — the agent knows its job
+
 ---
 
 ## V1.2 Fast Path (Recommended)
@@ -34,7 +55,7 @@ Then read project context as specified in the orientation file.
 
 ## V1.2 Invocation Syntax
 
-When invoking an agent (whether in main context or as a subagent), the invocation prompt should include:
+When invoking an agent (whether in main context or as a subagent), the invocation prompt should provide **context only**:
 
 ```
 You are the [Agent Name] for SYSTEM V1.2.
@@ -42,17 +63,17 @@ You are the [Agent Name] for SYSTEM V1.2.
 Read your orientation file:
 - system/v1.2/orientation/[ROLE]_ORIENTATION.md
 
-Then read project context:
-- projects/[project]/AUTHORITY.md
-- projects/[project]/plans/active/[plan].md (if executing)
-
-Execute: [task description]
+Context:
+- Project: projects/[project]/
+- [State description: what happened, what exists, what changed]
 
 Halt and surface to the human if:
 - Authority is missing or unclear
-- Plan scope is ambiguous
-- Tests fail or are missing
+- Scope is ambiguous
+- You encounter a halt condition
 ```
+
+**Note**: The invocation does NOT tell the agent what to do. The agent reads its orientation file to determine its responsibilities given the provided context.
 
 ### Engineer Invocation (File-Only Directive)
 
@@ -120,6 +141,123 @@ For situations requiring full context, the V1.1 protocol remains valid:
 
 ---
 
+## Invocation Examples: Correct vs Incorrect
+
+### Example 1: Plan Completion
+
+**INCORRECT** (provides instructions):
+```
+Historian: Plan 001 is complete.
+
+Please do the following:
+1. Verify all checkboxes are marked complete
+2. Move the plan from active/ to archive/
+3. Update DECISIONS.md if any new decisions were made
+4. Create a completion summary
+```
+
+**CORRECT** (provides context only):
+```
+Historian: Plan projects/notion-obligations/plans/active/001-initial-setup.md is complete.
+
+Context: The Engineer has marked all checkboxes complete and tests pass.
+```
+
+The Historian reads its orientation file to determine what to do when a plan completes. The invoker does not need to specify the steps.
+
+---
+
+### Example 2: Engineer Execution
+
+**INCORRECT** (provides instructions):
+```
+Engineer: Execute plan 001.
+
+Steps to follow:
+1. Read the plan
+2. Verify authority
+3. Execute each step in order
+4. Run tests after each step
+5. Update checkboxes
+6. Update worklog
+```
+
+**CORRECT** (provides context only):
+```
+Engineer: Execute plan projects/notion-obligations/plans/active/001-initial-setup.md
+
+Ignore prior conversation output. Use only: authority docs + the active plan + referenced code paths.
+```
+
+The Engineer knows from its orientation file that it must verify authority, execute steps in order, run tests, and update checkboxes/worklog.
+
+---
+
+### Example 3: Historian Plan Creation
+
+**INCORRECT** (provides instructions):
+```
+Historian: Create a plan for adding OAuth support.
+
+Include these sections:
+- Objective
+- Authority citations
+- Ordered work with checkboxes
+- Validation checklist
+- Worklog
+```
+
+**CORRECT** (provides context only):
+```
+Historian: Create an implementation plan for adding OAuth support.
+
+Context:
+- Project: projects/notion-obligations/
+- Relevant decision: DECISIONS.md#2026-01-01-authentication-strategy
+```
+
+The Historian knows from its orientation file (and templates) the required structure for implementation plans.
+
+---
+
+### Example 4: Post-Execution Documentation Update
+
+**INCORRECT** (provides instructions):
+```
+Historian: The OAuth feature is implemented.
+
+Please:
+1. Update ARCHITECTURE.md to reflect the new OAuth flow
+2. Add a decision entry for the token storage approach we used
+3. Update PIPELINE.md with the new authentication stage
+```
+
+**CORRECT** (provides context only):
+```
+Historian: OAuth implementation is complete.
+
+Context:
+- Project: projects/notion-obligations/
+- Completed plan: plans/archive/003-oauth-implementation.md
+- Changes made: New auth module in src/auth/, token storage in src/storage/
+```
+
+The Historian reads the completed plan and determines what documentation updates are needed based on its responsibilities.
+
+---
+
+### Key Differences
+
+| Aspect | Incorrect Pattern | Correct Pattern |
+|--------|-------------------|-----------------|
+| Instructions | Explicit task list | None |
+| Context | Minimal | Detailed state description |
+| Responsibility source | Invocation prompt | Orientation file |
+| Consistency | Varies by invoker | Always the same |
+| Auditability | Scattered across invocations | Centralized in docs |
+
+---
+
 ## Verification
 
 Before an agent begins execution, it should be able to answer:
@@ -145,5 +283,6 @@ Failure to follow this protocol results in:
 
 ## Changelog
 
+- **v1.2.1**: Added "Context, Not Instructions" principle and invocation examples (correct vs incorrect patterns)
 - **v1.2**: Added orientation files and tiered loading pattern for faster onboarding
 - **v1.1**: Initial protocol creation to address agents executing without reading their spec files

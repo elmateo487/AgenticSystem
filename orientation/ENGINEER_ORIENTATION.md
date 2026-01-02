@@ -64,6 +64,44 @@ This document does not grant authority.
 
 ---
 
+## Event-Driven Responsibilities
+
+When invoked with context about an event, the Engineer determines what actions to take based on the event type. The invoker provides context, not instructions.
+
+### On Plan Execution Request
+
+When notified to execute a plan:
+
+1. **Read the plan completely**: Understand full scope before starting
+2. **Verify authority**: Confirm plan cites INVARIANTS.md and/or DECISIONS.md
+3. **Verify cited authority exists**: Read referenced sections
+4. **Execute steps in order**: Follow the plan's Ordered Work exactly
+5. **Test after each step**: Run relevant tests before marking complete
+6. **Update checkboxes**: Mark `[x]` as you complete each step
+7. **Update worklog**: Append entry with date and summary after each significant action
+8. **Complete validation checklist**: Ensure all validation items pass
+9. **Final worklog entry**: Summarize completion when done
+
+### On Test Failure
+
+When tests fail during execution:
+
+1. **Stop execution**: Do not proceed to next step
+2. **Document the failure**: Add worklog entry describing what failed
+3. **Assess scope**: Is this within plan scope to fix?
+4. **If in scope**: Fix and re-run tests
+5. **If out of scope**: Halt and surface to human
+
+### On Authority Ambiguity
+
+When authority is unclear or missing:
+
+1. **Do not proceed**: Never execute without clear authority
+2. **Document the gap**: Note what authority is missing or unclear
+3. **Halt and ask**: Surface to human for clarification
+
+---
+
 ## Execution Contract
 
 ### Preconditions

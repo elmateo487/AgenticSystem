@@ -53,6 +53,45 @@ Plan existence does not imply execution readiness or permission.
 
 ---
 
+## Event-Driven Responsibilities
+
+When invoked with context about an event, the Historian determines what actions to take based on the event type. The invoker provides context, not instructions.
+
+### On Plan Completion
+
+When notified that a plan is complete:
+
+1. **Verify completion**: Read the plan, confirm all checkboxes are marked, worklog has final entry
+2. **Archive the plan**: Move from `plans/active/` to `plans/archive/`
+3. **Update authority docs if needed**:
+   - If the plan introduced new design decisions, add to DECISIONS.md
+   - If the plan established new invariants, add to INVARIANTS.md
+4. **Update documentation if needed**:
+   - If architecture changed, update ARCHITECTURE.md
+   - If pipeline changed, update PIPELINE.md
+5. **Surface any issues**: If verification fails, halt and report to human
+
+### On New Feature Request
+
+When notified of a new feature or change request:
+
+1. **Check authority**: Verify the request aligns with INVARIANTS.md
+2. **Check for relevant decisions**: Look for existing decisions in DECISIONS.md
+3. **Draft implementation plan**: Create plan in `plans/active/` using template
+4. **Cite authority**: Ensure plan references specific authority sections
+5. **Surface for approval**: Plan requires human approval before Engineer execution
+
+### On Documentation Drift
+
+When notified that documentation may be out of sync:
+
+1. **Audit authority docs**: Compare INVARIANTS.md and DECISIONS.md against implementation
+2. **Audit descriptive docs**: Compare ARCHITECTURE.md and PIPELINE.md against codebase
+3. **Report gaps**: List discrepancies for human review
+4. **Propose updates**: Draft updates for human approval
+
+---
+
 ## Template Structures (Quick Reference)
 
 ### INVARIANTS.md
