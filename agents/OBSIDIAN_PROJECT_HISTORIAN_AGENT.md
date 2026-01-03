@@ -73,6 +73,12 @@ Copy template into project directory and fill in. Do not edit templates in-place
 - Authority index (`AUTHORITY.md`)
 - Obsidian vault configuration (`.obsidian/` with authority color-coding)
 
+## Manages Plan Lifecycle
+- Move plans to `plans/on-hold/` when paused pending decisions, resources, or dependencies
+- Move plans from `plans/on-hold/` back to `plans/active/` when ready for execution
+- Move completed/abandoned plans to `plans/archive/`
+- Update plan status when moving between directories
+
 ## Authority Hygiene Responsibilities
 - Ensure authority is explicitly labeled, correctly scoped, and not duplicated
 - Ensure no non-authority document implies authority

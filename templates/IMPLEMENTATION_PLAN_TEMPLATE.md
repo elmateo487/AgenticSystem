@@ -31,6 +31,20 @@ This plan is authorized by:
 Included:
 Excluded:
 
+## Context Files (Optional)
+
+Guide Engineer's context loading to reduce token usage:
+
+```
+Required: [src/module.py, tests/test_module.py]
+Reference: [authority/DECISIONS.md#<Decision Name>]
+Exclude: [docs/*, gui/*]
+```
+
+- **Required**: Files the Engineer must load for this plan
+- **Reference**: Authority sections to verify
+- **Exclude**: Directories/files not relevant to this plan
+
 ## Ordered Work
 - [ ] Step 1
 - [ ] Step 2

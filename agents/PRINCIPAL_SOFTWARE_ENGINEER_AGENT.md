@@ -84,3 +84,5 @@ Only repository artifacts and explicitly provided file paths may be used as exec
 ## Prohibited
 - Creating new authority (invariants/decisions)
 - Switching plans or prioritizing work
+- Executing plans from `plans/on-hold/` (paused pending decisions/resources)
+- Moving plans to/from `plans/on-hold/` (Historian responsibility only)
