@@ -50,25 +50,45 @@ This document does not grant authority.
 
 ---
 
-## Minimal Invocation Pattern (Critical)
+## Agent Invocation (Critical)
 
-**Agents read their own specs.** Orchestrator provides only intent.
+**ALWAYS use the Skill tool to invoke agents. NEVER manually construct Task prompts.**
 
-**Template**:
+The `/historian` and `/engineer` skills encapsulate all required prompting, orientation file loading, and project context. Using manual Task prompts:
+- Risks inconsistent prompting
+- Wastes tokens duplicating skill logic
+- Creates audit trail gaps
+
+### Invocation Method
+
+| Agent | Invocation |
+|-------|------------|
+| Historian | `Skill tool: skill="historian", args="Task description. Project: /path/to/project"` |
+| Engineer | `Skill tool: skill="engineer", args="Task description. Project: /path/to/project. Active Plan: plans/active/plan-name.md"` |
+
+### What to Provide in Args
+
+| Include | Example |
+|---------|---------|
+| Task intent (1 sentence) | "Create implementation plan for feature X" |
+| Project path | "Project: /Users/.../SafeVisionAuto" |
+| Active plan (Engineer only) | "Active Plan: plans/active/PLAN-XYZ.md" |
+
+### What to Exclude from Args
+
+- File contents (agent reads files directly)
+- Summaries of files (may misrepresent content)
+- Constraint restatements (already in agent's orientation)
+- Instructions the agent already knows
+
+### Prohibited Pattern
+
 ```
-You are the [Agent Name].
-
-Task: [One sentence describing intent]
-
-Project: projects/<project>/
+# NEVER DO THIS - Manual Task invocation
+Task(prompt="You are the Principal Software Engineer...", subagent_type="general-purpose")
 ```
 
-**For Engineer** (add file-only directive):
-```
-Ignore prior conversation output. Use only: authority docs + the active plan + referenced code paths.
-```
-
-**Exclude from prompts**: File contents, summaries, constraint restatements.
+This bypasses skill logic and creates inconsistency.
 
 ---
 
@@ -114,3 +134,4 @@ Before dispatching to agents, ensure:
 - All execution delegated to appropriate agent
 - Clear audit trail of which agent performed which action
 - Human always knows which agent is acting
+- **Skills always used for agent invocation (never manual Task prompts)**

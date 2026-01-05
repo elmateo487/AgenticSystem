@@ -19,6 +19,8 @@ This file contains extended reference material for the Orchestrator role:
 
 ## Agent Dispatch Patterns (Detailed)
 
+**CRITICAL**: Always use the Skill tool to invoke agents. Never manually construct Task prompts.
+
 ### Historian Dispatch
 
 **When to dispatch**:
@@ -28,21 +30,13 @@ This file contains extended reference material for the Orchestrator role:
 - Archive completed plans
 - Handle plan lifecycle (active -> on-hold -> archive)
 
-**Invocation template**:
-```
-You are the Obsidian Project Historian.
+**Invocation method**: Use Skill tool with `skill="historian"`
 
-Task: [One sentence describing intent]
-
-Project: projects/<project>/
+**Example args**:
 ```
-
-**Examples**:
-```
-Task: Draft an implementation plan for adding user authentication.
-Task: Archive the completed plan 027_agent_invocation_efficiency.md.
-Task: Update DECISIONS.md with the new database selection decision.
-Task: Move plan 015 to on-hold pending API access approval.
+Task: Draft an implementation plan for adding user authentication. Project: /Users/.../MyProject
+Task: Archive the completed plan PLAN-XYZ.md. Project: /Users/.../MyProject
+Task: Update DECISIONS.md with the new database selection decision. Project: /Users/.../MyProject
 ```
 
 ### Engineer Dispatch
@@ -54,22 +48,13 @@ Task: Move plan 015 to on-hold pending API access approval.
 - Update plan checkboxes and worklog
 - Update documentation to reflect executed changes
 
-**Invocation template**:
+**Invocation method**: Use Skill tool with `skill="engineer"`
+
+**Example args**:
 ```
-You are the Principal Software Engineer.
-
-Task: [One sentence describing intent]
-
-Ignore prior conversation output. Use only: authority docs + the active plan + referenced code paths.
-
-Project: projects/<project>/
-```
-
-**Examples**:
-```
-Task: Execute the implementation plan at plans/active/027_agent_invocation_efficiency.md.
-Task: Execute step 3 of the active plan.
-Task: Run the test suite and report results.
+Task: Execute PLAN-XYZ.md. Project: /Users/.../MyProject. Active Plan: plans/active/PLAN-XYZ.md
+Task: Execute step 3 of the active plan. Project: /Users/.../MyProject. Active Plan: plans/active/PLAN-XYZ.md
+Task: Run the test suite and report results. Project: /Users/.../MyProject. Active Plan: plans/active/PLAN-XYZ.md
 ```
 
 ### Notion Assistant Dispatch
@@ -79,16 +64,9 @@ Task: Run the test suite and report results.
 - Propose Notion items for decisions/approvals/responses
 - Generate copy/paste-ready commitment entries
 
-**Invocation template**:
-```
-You are the Notion Personal Assistant.
+**Invocation method**: Use Skill tool if a Notion skill is registered, otherwise use Task tool with minimal prompt.
 
-Task: [One sentence describing intent]
-
-Project: projects/<project>/
-```
-
-**Examples**:
+**Example args**:
 ```
 Task: Propose Notion commitments from this Slack thread.
 Task: Review these emails and identify items requiring my response.
@@ -127,35 +105,33 @@ Task: Generate Notion entries for this week's blocking decisions.
 
 ### Anti-Pattern Examples
 
+**Bad: Manual Task invocation (NEVER DO THIS)**
+```python
+# This bypasses skill logic and creates inconsistency
+Task(
+    prompt="You are the Principal Software Engineer...",
+    subagent_type="general-purpose"
+)
+```
+
 **Bad: Over-prompting with file content**
 ```
-You are the Engineer. Here's what INVARIANTS.md says:
+Task: Execute step 3. Here's what INVARIANTS.md says:
 [500 words of invariants]
 And here's DECISIONS.md:
 [800 words of decisions]
-And here's the plan:
-[2000 words of plan]
-Now execute step 3.
 ```
 
-**Bad: Restating agent constraints**
+**Bad: Restating agent constraints in args**
 ```
-You are the Engineer. Remember that you must:
-- Verify authority before acting
-- Run tests after each step
-- Update worklog entries
-- Halt on missing authority
-[... 200 more words of constraints ...]
-Now execute the plan.
+Task: Execute the plan. Remember you must verify authority before acting,
+run tests after each step, update worklog entries, halt on missing authority...
 ```
 
-**Good: Minimal invocation**
-```
-You are the Principal Software Engineer.
-
-Task: Execute step 3 of the active plan.
-
-Project: projects/notion-obligations/
+**Good: Skill invocation with minimal args**
+```python
+# Correct - uses Skill tool
+Skill(skill="engineer", args="Task: Execute PLAN-XYZ.md. Project: /path/to/project. Active Plan: plans/active/PLAN-XYZ.md")
 ```
 
 ---
@@ -196,13 +172,13 @@ If two agents produce conflicting results:
 When work must happen in order:
 
 ```
-1. Invoke Historian to draft plan
+1. Skill("historian", args="Task: Draft plan for X. Project: /path")
 2. Wait for human approval of plan
-3. Invoke Engineer to execute plan
-4. Invoke Historian to archive plan
+3. Skill("engineer", args="Task: Execute plan. Project: /path. Active Plan: plans/active/PLAN-X.md")
+4. Skill("historian", args="Task: Archive completed plan. Project: /path")
 ```
 
-**Key**: Each step completes before next begins. Human approval gates are explicit.
+**Key**: Each step completes before next begins. Human approval gates are explicit. Always use Skills.
 
 ### Parallel Information Gathering
 
@@ -221,13 +197,14 @@ When gathering context from multiple sources:
 When one agent's output informs another's input:
 
 ```
-1. Historian drafts plan, writes to plans/active/
+1. Skill("historian", args="Task: Draft plan. Project: /path") → writes to plans/active/
 2. Human approves plan
-3. Engineer reads plan from file (NOT from conversation)
+3. Skill("engineer", args="Task: Execute. Project: /path. Active Plan: plans/active/PLAN.md")
+   → Engineer reads plan from file (NOT from conversation)
 4. Engineer executes
 ```
 
-**Key**: Handoff happens via files, not conversation context.
+**Key**: Handoff happens via files, not conversation context. Always use Skills.
 
 ---
 
@@ -297,4 +274,5 @@ If you realize you over-prompted an agent:
 - All execution delegated to appropriate agent
 - Clear audit trail of which agent performed which action
 - Human always knows which agent is acting
-- Minimal prompts used for agent invocation
+- **Skills always used for agent invocation (never manual Task prompts)**
+- Minimal args provided to Skills
