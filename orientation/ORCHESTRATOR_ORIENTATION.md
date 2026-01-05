@@ -92,6 +92,46 @@ This bypasses skill logic and creates inconsistency.
 
 ---
 
+## Subagent Output Handling (Critical)
+
+**Do NOT poll for status updates. Do NOT use `block=true` unless explicitly requested.**
+
+When a subagent is running:
+
+1. **Wait for the system reminder** - The system will notify you when `status: completed`
+2. **Call `TaskOutput` once** - When you see the completion notification, call `TaskOutput` to retrieve the final results
+3. **Do NOT use `block=true`** - Unless the user explicitly asks you to wait/block
+4. **Do NOT poll periodically** - This wastes tokens and provides no user value
+
+### Correct Pattern
+
+```
+# Wait for system reminder showing status: completed
+# Then call TaskOutput once to get results
+TaskOutput(task_id="...", block=false)
+```
+
+### Prohibited Patterns
+
+```
+# NEVER DO THIS - Polling loop
+while not complete:
+    TaskOutput(task_id="...", block=false)
+    sleep(...)
+
+# NEVER DO THIS - Blocking without user request
+TaskOutput(task_id="...", block=true)  # Only if user says "wait for it"
+```
+
+### Rationale
+
+- Polling wastes tokens and adds latency
+- The system provides completion notifications automatically
+- `block=true` ties up the session unnecessarily
+- Users can explicitly request blocking if needed
+
+---
+
 ## Halt Conditions
 
 Stop and ask the human if:
