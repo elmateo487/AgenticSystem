@@ -7,7 +7,7 @@ This document does not grant authority. It provides architectural guidance only.
 
 ## Purpose
 
-This document describes patterns for using sub-agents (nested agent invocations) in SYSTEM V1.2 while maintaining efficiency and auditability.
+This document describes patterns for using sub-agents (nested agent invocations) in SYSTEM V1.3 while maintaining efficiency and auditability.
 
 ---
 
@@ -32,11 +32,11 @@ This document describes patterns for using sub-agents (nested agent invocations)
 ```
 Orchestrator (minimal context)
   |
-  +-- Agent A (scoped context)
-  |     Returns: Condensed result
+  +-- Historian (scoped context)
+  |     Returns: Beads convoy created, file written
   |
-  +-- Agent B (scoped context)
-        Returns: Condensed result
+  +-- Engineer (scoped context)
+        Returns: Tasks completed, tests passing
 ```
 
 ### Key Principles
@@ -44,7 +44,7 @@ Orchestrator (minimal context)
 1. **Each invocation is explicit**: No implicit agent chaining
 2. **Each agent has scoped context**: Load only what that agent needs
 3. **Parent receives condensed result**: Not full context
-4. **Audit trail via files**: Inter-agent handoffs through files, not conversation
+4. **Audit trail via Beads + files**: Inter-agent handoffs through Beads issues and files
 
 ---
 
@@ -60,17 +60,20 @@ Human: "Implement the new API endpoint"
 Orchestrator:
   1. Invoke Historian to draft implementation plan
      Input: Feature requirements
-     Output: plans/active/new_api_endpoint.md
+     Output: Beads convoy bd-XYZ (status: pending_approval)
 
   2. Human approves plan
+     bd update bd-XYZ --status approved --label authority:granted
 
   3. Invoke Engineer to execute plan
-     Input: plans/active/new_api_endpoint.md
-     Output: Code changes, tests, worklog updates
+     Input: Convoy bd-XYZ
+     Output: Code changes, tests, Beads comments
 
-  4. Invoke Historian to archive plan
-     Input: Completed plan
-     Output: Plan moved to archive, docs updated
+  4. Engineer requests completion approval
+     bd update bd-XYZ --status pending_human_approval
+
+  5. Human approves completion
+     bd update bd-XYZ --status completed
 ```
 
 ### Token Efficiency
@@ -78,9 +81,8 @@ Orchestrator:
 | Phase | Agent | Context Loaded | Est. Tokens |
 |-------|-------|----------------|-------------|
 | Planning | Historian | Orientation + authority | 2,000 |
-| Execution | Engineer | Orientation + plan + code | 5,000 |
-| Archival | Historian | Orientation + plan | 1,500 |
-| **Total** | | | **8,500** |
+| Execution | Engineer | Orientation + convoy + code | 5,000 |
+| **Total** | | | **7,000** |
 
 vs. Single Agent (everything): ~15,000-20,000 tokens
 
@@ -96,9 +98,8 @@ Use when gathering information from multiple independent sources.
 Human: "What's the current state of the project?"
 
 Orchestrator (parallel):
-  1. Invoke Historian to summarize authority state
-     Input: authority/
-     Output: Summary of invariants and decisions
+  1. Query Beads for convoy status
+     bd list --type convoy --label "authority:granted"
 
   2. Invoke Engineer to summarize code state (read-only)
      Input: src/, tests/
@@ -122,18 +123,19 @@ Use when part of a task requires specialized handling.
 
 ```
 Engineer executing plan:
-  - Encounters blocking condition
-  - Cannot resolve within authority
+  - Encounters test failure
+  - Cannot resolve without modifying test or degrading implementation
   - Needs human decision
 
 Engineer:
-  1. Document blocker in worklog
-  2. Request Orchestrator invoke Notion Assistant
+  1. HALT the convoy
+     bd update bd-XYZ --status halted --label halted:test-conflict
+     bd comment bd-XYZ "HALTED: test_X fails. Need guidance."
 
 Orchestrator:
-  3. Invoke Notion Assistant
-     Input: Blocker description
-     Output: Proposed Notion commitment
+  2. Surface halt to human
+  3. Wait for human decision
+```
 
 ---
 
@@ -172,7 +174,7 @@ Engineer (in same conversation):
 
 **Problem**: Violates artifact boundary rules, no audit trail
 
-**Correct**: Historian writes to files, Engineer reads from files
+**Correct**: Historian writes to Beads/files, Engineer reads from Beads/files
 
 ### Anti-Pattern 3: Micro-Invocation
 
@@ -188,6 +190,19 @@ Orchestrator:
 **Problem**: Each invocation has ~500-1000 token overhead
 
 **Correct**: Single invocation with clear scope
+
+### Anti-Pattern 4: Orchestrator Writes to Beads
+
+**Wrong**: Orchestrator creates or updates Beads issues directly
+
+```
+Orchestrator:
+  bd create "New task" --parent bd-XYZ  # VIOLATION
+```
+
+**Problem**: Violates Orchestrator boundary (dispatcher, not executor)
+
+**Correct**: Orchestrator invokes Historian to create, Engineer to update
 
 ---
 
@@ -211,19 +226,20 @@ Avoid sub-agents when: Task can be done in current context
 ## Best Practices
 
 1. **Minimal invocation prompts**: Agent reads its own spec
-2. **File-based handoffs**: Inter-agent communication via files
+2. **Beads + file-based handoffs**: Inter-agent communication via Beads and files
 3. **Scoped context loading**: Each agent loads only what it needs
 4. **Clear task boundaries**: One clear objective per invocation
-5. **Audit trail**: All actions traceable to files + invocation
+5. **Audit trail**: All actions traceable to Beads issues + files + invocation
+6. **Skills for invocation**: Always use Skill tool, never manual Task prompts
 
 ---
 
-## V1.2 Alignment
+## V1.3 Alignment
 
-Sub-agent patterns preserve all SYSTEM V1.2 principles:
+Sub-agent patterns preserve all SYSTEM V1.3 principles:
 
 - **Invocation-only**: Each sub-agent invoked explicitly
 - **Fresh context**: Each sub-agent loads current state
-- **Auditability**: All handoffs via version-controlled files
-- **Documentation as source of truth**: Agents read from files, not conversation
+- **Auditability**: All handoffs via Beads issues and version-controlled files
+- **Tests are sacrosanct**: Engineer halts rather than modifying tests
 - **No autonomy**: Orchestrator dispatches, does not decide
