@@ -64,14 +64,25 @@ You create plans in `draft`, then move to `pending_approval`. Humans grant autho
 
 **Why this matters**: Epic descriptions are read once for context. Subtasks are the actionable work items. Duplicating AC/scope in both creates drift and confusion.
 
+### 3-Level Hierarchy (Maximum Depth)
+
+Plans follow a strict 3-level hierarchy:
+
+| Level | Type | Contains | Children Allowed |
+|-------|------|----------|------------------|
+| 1 | **Epic** | Problem context, rationale, design decisions | Yes (subtasks) |
+| 2 | **Subtask** | Implementation details, files to modify | Yes (AC items) |
+| 3 | **AC item** | Single actionable task | **No** (leaf node) |
+
+**Rule**: AC items (level 3) are leaf nodes. They have no children and no checkboxes.
+
 ### Acceptance Criteria as Child Tasks
 
-**Rule**: If a subtask has acceptance criteria checkboxes, break them into child tasks instead.
+**Rule**: If a subtask has acceptance criteria, break them into child tasks (level 3).
 
 | Instead of This | Do This |
 |-----------------|---------|
 | Subtask with `- [ ] AC item 1` in description | Create child task: "AC item 1" under subtask |
-| Subtask with `- [ ] AC item 2` in description | Create child task: "AC item 2" under subtask |
 | Multiple checkbox items in one subtask | Multiple child tasks under the subtask |
 
 **Why**:
@@ -79,14 +90,21 @@ You create plans in `draft`, then move to `pending_approval`. Humans grant autho
 - Child tasks appear in bdui-compact with completion counters (e.g., `2/5`)
 - Progress is visible at all levels of the hierarchy
 - Each AC item can be independently assigned, blocked, or discussed
+- Engineer reads subtask for context, then works through AC items
 
 **Example**:
 ```bash
-# Parent subtask
-bd create "Implement validation" --parent bd-EPIC --priority 1
+# Level 2: Subtask with implementation context
+bd create "Implement validation" --parent bd-EPIC --priority 1 \
+  --description "## Implementation
+- Add validation in StorageManager.validate_location()
+- Check path exists and is writable
 
-# AC items as children (not checkboxes in description)
-bd create "Validate path exists and is writable" --parent bd-SUBTASK --priority 1
+## Files to Modify
+- src/services/storage_manager.py"
+
+# Level 3: AC items as children (leaf nodes - no further nesting)
+bd create "Validate path and raise StorageError" --parent bd-SUBTASK --priority 1
 bd create "Verify sufficient disk space (>1GB)" --parent bd-SUBTASK --priority 2
 bd create "Add unit tests for edge cases" --parent bd-SUBTASK --priority 3
 ```

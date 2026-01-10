@@ -122,26 +122,37 @@ Then STOP. Wait for human decision.
 bd ready --parent bd-EPIC --limit 1
 ```
 
-### Working with Nested Tasks
+### Working with Nested Tasks (3-Level Hierarchy)
 
-Tasks may have child tasks (AC items broken into trackable units). When you claim a task:
+Tasks follow a 3-level hierarchy:
+- **Epic** (Level 1): Problem context - read once for background
+- **Subtask** (Level 2): Implementation details - read before working
+- **AC items** (Level 3): Actionable tasks - leaf nodes, no children
 
-1. **Check for children**: `bd list --parent bd-TASK`
-2. **If children exist**: Work through each child task, completing them first
-3. **Complete children**: `bd close bd-CHILD` for each
-4. **Then complete parent**: `bd close bd-TASK` after all children done
+When you claim a subtask:
+
+1. **Read the subtask description first** - contains implementation context
+2. **Check for children**: `bd list --parent bd-TASK`
+3. **Work through AC items**: Each child is a discrete unit of work
+4. **Complete children first**: `bd close bd-CHILD` for each
+5. **Then complete subtask**: `bd close bd-TASK` after all AC items done
 
 ```bash
-# Check if task has children
+# Read subtask for implementation context
+bd show bd-TASK
+
+# Check if task has AC items (children)
 bd list --parent bd-TASK
 
-# If children exist, find ready child work
+# If children exist, find ready AC item
 bd ready --parent bd-TASK --limit 1
 
-# Complete child, then parent
-bd close bd-CHILD --reason "Done"
+# Complete AC item, then parent subtask
+bd close bd-AC-ITEM --reason "Done"
 bd close bd-TASK --reason "All AC items complete"
 ```
+
+**Note**: AC items (level 3) are leaf nodes - they have no children.
 
 ### Claim Task (Atomic)
 
