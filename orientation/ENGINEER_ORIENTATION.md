@@ -33,7 +33,7 @@ This document does not grant authority.
 
 **Valid Sources**:
 - Authority docs (`authority/INVARIANTS.md`, `authority/DECISIONS.md`)
-- Convoy description and tasks (via `bd show`)
+- Epic description and tasks (via `bd show`)
 - Referenced code paths
 
 **Excluded**:
@@ -50,9 +50,9 @@ This ensures auditability and prevents context drift.
 Before executing ANY task, verify ALL five checks:
 
 ```
-1. Get task's parent convoy: bd show bd-TASK --json | jq '.parent'
-2. Check convoy has label: authority:granted
-3. Check convoy does NOT have label: authority:suspended
+1. Get task's parent epic: bd show bd-TASK --json | jq '.parent'
+2. Check epic has label: authority:granted
+3. Check epic does NOT have label: authority:suspended
 4. Check no children have status: needs_triage
 5. Check all authority_citations resolve to existing sections
 ```
@@ -104,10 +104,10 @@ This includes:
 
 ```bash
 # If test seems wrong:
-bd comment bd-CONVOY "HALTED: test_X fails. Test expects Y but implementation does Z. Need guidance on which is correct."
+bd comment bd-EPIC "HALTED: test_X fails. Test expects Y but implementation does Z. Need guidance on which is correct."
 
 # If implementation would need to worsen:
-bd comment bd-CONVOY "HALTED: test_X fails. Can only pass by [describe hack/degradation]. Need guidance on approach."
+bd comment bd-EPIC "HALTED: test_X fails. Can only pass by [describe hack/degradation]. Need guidance on approach."
 ```
 
 Then STOP. Wait for human decision.
@@ -119,7 +119,28 @@ Then STOP. Wait for human decision.
 ### Find Ready Work
 
 ```bash
-bd ready --parent bd-CONVOY --limit 1
+bd ready --parent bd-EPIC --limit 1
+```
+
+### Working with Nested Tasks
+
+Tasks may have child tasks (AC items broken into trackable units). When you claim a task:
+
+1. **Check for children**: `bd list --parent bd-TASK`
+2. **If children exist**: Work through each child task, completing them first
+3. **Complete children**: `bd close bd-CHILD` for each
+4. **Then complete parent**: `bd close bd-TASK` after all children done
+
+```bash
+# Check if task has children
+bd list --parent bd-TASK
+
+# If children exist, find ready child work
+bd ready --parent bd-TASK --limit 1
+
+# Complete child, then parent
+bd close bd-CHILD --reason "Done"
+bd close bd-TASK --reason "All AC items complete"
 ```
 
 ### Claim Task (Atomic)
@@ -152,8 +173,8 @@ bd close bd-TASK --reason "Implementation complete, tests pass"
 ### Request Plan Completion Approval
 
 ```bash
-bd update bd-CONVOY --status pending_human_approval
-bd comment bd-CONVOY "All tasks complete. Tests pass. Ready for human approval."
+bd update bd-EPIC --status pending_human_approval
+bd comment bd-EPIC "All tasks complete. Tests pass. Ready for human approval."
 ```
 
 ---
@@ -162,7 +183,7 @@ bd comment bd-CONVOY "All tasks complete. Tests pass. Ready for human approval."
 
 ```
 1. Human directs: "Work on plan X"
-2. bd ready --parent bd-CONVOY --limit 1
+2. bd ready --parent bd-EPIC --limit 1
 3. Authority verification (5 checks)
 4. bd update bd-TASK --claim
 5. Execute the work
@@ -170,7 +191,7 @@ bd comment bd-CONVOY "All tasks complete. Tests pass. Ready for human approval."
 7. bd close bd-TASK --reason "Completed"
 8. When ALL tasks done:
    a. Write/run tests to prove acceptance criteria
-   b. If tests pass: bd update bd-CONVOY --status pending_human_approval
+   b. If tests pass: bd update bd-EPIC --status pending_human_approval
    c. If tests fail: Fix implementation OR HALT for human
 ```
 
@@ -217,7 +238,7 @@ bd update bd-TASK --status ready --assignee ""
 ## Project Context Requirements
 
 When invoked for a project:
-1. Parent convoy ID (from human or orchestrator)
+1. Parent epic ID (from human or orchestrator)
 2. `authority/INVARIANTS.md` - Constraints
 3. `authority/DECISIONS.md` - Design decisions
 4. Referenced code paths
@@ -226,19 +247,19 @@ When invoked for a project:
 
 ## Worklog (Beads Comments)
 
-Log progress using Beads comments on the convoy or task:
+Log progress using Beads comments on the epic or task:
 
 ```bash
 # Progress update on task
 bd comment bd-TASK "Completed step 1: Added validation logic"
 
-# Summary on convoy
-bd comment bd-CONVOY "2026-01-09: Implemented auth flow, tests passing - Engineer"
+# Summary on epic
+bd comment bd-EPIC "2026-01-09: Implemented auth flow, tests passing - Engineer"
 ```
 
 **Format**: `YYYY-MM-DD: <Summary of what was done> - Engineer`
 
-Comments create an audit trail visible to humans reviewing the convoy.
+Comments create an audit trail visible to humans reviewing the epic.
 
 ---
 
