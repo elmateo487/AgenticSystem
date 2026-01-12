@@ -19,7 +19,7 @@
 **Key change for CRITICAL-02**: The completion flow is now:
 1. Engineer completes all tasks
 2. Engineer writes/runs tests to prove acceptance criteria
-3. Engineer moves convoy to `pending_human_approval`
+3. Engineer moves epic to `pending_human_approval`
 4. Human reviews and approves → `completed`
 
 **Test Integrity additions**:
@@ -64,26 +64,30 @@ The BEADS_INTEGRATION.md document provides comprehensive guidance for integratin
 2. Reword to: "When mutation detected, system PROPOSES suspension; human must confirm"
 3. Alternative: Keep automatic suspension but require it be treated as a safety mechanism that still requires human acknowledgment before work resumes (which the document partially addresses)
 
-**Mitigation Note**: The document does require human re-approval to restore authority (line 431), which partially addresses this concern. However, the automatic removal of `authority:granted` is still autonomous action affecting authority state.
+**Mitigation Note**: The document does require human re-approval to restore authority (line 431), which partially addresses this concern.
+
+**UPDATE (2026-01-10)**: The `authority:granted` label system has been removed. Human invocation is now the authority - when you invoke an agent, that is the authorization. This simplifies the authority model significantly.
 
 ---
 
-### CRITICAL-02: Convoy Auto-Close Represents Autonomous State Change
+### CRITICAL-02: Epic Auto-Close Represents Autonomous State Change
 
 **Location**: Lines 112, 439
 
 **Issue**:
-- Line 112: `| in_progress | completed | All children closed | Beads (auto, convoy) |`
-- Line 439: "Convoy auto-closes (Beads convoy behavior)"
+- Line 112: `| in_progress | completed | All children closed | Beads (auto, epic) |`
+- Line 439: "Epic auto-closes (Beads epic behavior)"
 
-**V1.2 Violation**: The automatic closure of a plan (convoy) based on child task completion is autonomous system behavior that changes authoritative state without explicit human invocation.
+**V1.2 Violation**: The automatic closure of a plan (epic) based on child task completion is autonomous system behavior that changes authoritative state without explicit human invocation.
 
 **Severity**: CRITICAL
 
 **Recommendation**:
-1. Replace auto-close with human confirmation: "When all tasks closed, convoy moves to `pending_completion` state; human must explicitly close"
-2. Or document this as acceptable Beads behavior that does not affect authority (since authority:granted label remains)
-3. Clarify whether auto-close removes authority or is purely an organizational state change
+1. Replace auto-close with human confirmation: "When all tasks closed, epic moves to `pending_completion` state; human must explicitly close"
+2. Or document this as acceptable Beads behavior that is purely an organizational state change
+3. Clarify whether auto-close is purely an organizational state change
+
+**UPDATE (2026-01-10)**: Authority labels removed. Human invocation = authority.
 
 ---
 
@@ -119,11 +123,11 @@ The state `rejected` is not defined in the State Definitions table (lines 92-99)
 - Line 683: `--status done`
 - Line 701: `--status done`
 
-The document provides State Definitions only for convoy issues (lines 92-99), not for task issues. What are the valid task statuses?
+The document provides State Definitions only for epic issues (lines 92-99), not for task issues. What are the valid task statuses?
 
 **Severity**: MEDIUM
 
-**Recommendation**: Add a "Task State Definitions" section parallel to the convoy states, defining valid task statuses and their meanings.
+**Recommendation**: Add a "Task State Definitions" section parallel to the epic states, defining valid task statuses and their meanings.
 
 ---
 
@@ -166,23 +170,16 @@ Is `--claim` a flag that requires a session ID, or is it a standalone flag? Line
 
 **Issue**: The Engineer workflow (lines 381-390) shows:
 ```
-3. Verify authority (check convoy labels + citations)
+3. Verify authority (check epic labels + citations)
 ```
 
-But the detailed verification steps from lines 158-164 are not referenced:
-```
-1. Get task's parent convoy
-2. Check convoy has label: authority:granted
-3. Check no children have status: needs_triage
-4. Check all authority_citations resolve to existing sections
-5. If any check fails: HALT and report
-```
+But the detailed verification steps from lines 158-164 are not referenced.
 
-The workflow summary is less rigorous than the detailed specification.
+**UPDATE (2026-01-10)**: Authority verification via labels has been removed. Human invocation is now the authority. The engineer simply reads `/tmp/work.json` and begins work when invoked.
 
-**Severity**: MEDIUM
+**Severity**: RESOLVED
 
-**Recommendation**: In the Engineer Workflow section, explicitly reference the full verification procedure: "See 'Authority Verification (Engineer)' section above" or inline the complete checklist.
+**Recommendation**: N/A - authority model simplified.
 
 ---
 
@@ -237,7 +234,7 @@ V1.2 ORCHESTRATOR_ORIENTATION.md permits "Read files (for context)" - does this 
 
 **Severity**: LOW
 
-**Recommendation**: Add a definition: "Mutation: Any change to a convoy issue's description, tasks, or authority citations after approval has been granted."
+**Recommendation**: Add a definition: "Mutation: Any change to a epic issue's description, tasks, or authority citations after approval has been granted."
 
 ---
 
@@ -269,8 +266,8 @@ Questions not addressed:
 
 **Location**: Lines 443-449
 
-**Issue**: Archive files use `YYYY-MM-DD-convoy-title.md` format, but:
-- How is "convoy-title" derived from the actual title? (slugification rules)
+**Issue**: Archive files use `YYYY-MM-DD-epic-title.md` format, but:
+- How is "epic-title" derived from the actual title? (slugification rules)
 - What happens with duplicate dates?
 - Who performs the export - Historian or Engineer?
 
@@ -326,7 +323,7 @@ The following V1.2 principles are correctly preserved:
 |----------------|----------------|----------|
 | Human invocation only | Preserved | Line 9: "Nothing runs unless explicitly invoked by a human" |
 | Documentation as authority source | Preserved | Authority layer remains in files (lines 18-24) |
-| Plans define execution scope | Preserved | Convoy issues serve same function |
+| Plans define execution scope | Preserved | Epic issues serve same function |
 | Tests define correctness | Not mentioned | **Gap**: Add statement about tests |
 | Historian boundary (no code execution) | Preserved | Lines 313-320 show no code execution |
 | Engineer boundary (executes plans) | Preserved | Lines 370-411 |

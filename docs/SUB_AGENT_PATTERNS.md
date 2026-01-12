@@ -33,7 +33,7 @@ This document describes patterns for using sub-agents (nested agent invocations)
 Orchestrator (minimal context)
   |
   +-- Historian (scoped context)
-  |     Returns: Beads convoy created, file written
+  |     Returns: Beads epic created, file written
   |
   +-- Engineer (scoped context)
         Returns: Tasks completed, tests passing
@@ -60,13 +60,13 @@ Human: "Implement the new API endpoint"
 Orchestrator:
   1. Invoke Historian to draft implementation plan
      Input: Feature requirements
-     Output: Beads convoy bd-XYZ (status: pending_approval)
+     Output: Beads epic bd-XYZ (status: pending_approval)
 
   2. Human approves plan
-     bd update bd-XYZ --status approved --label authority:granted
+     bd update bd-XYZ --status approved
 
-  3. Invoke Engineer to execute plan
-     Input: Convoy bd-XYZ
+  3. Human invokes Engineer to execute plan
+     Input: Epic bd-XYZ
      Output: Code changes, tests, Beads comments
 
   4. Engineer requests completion approval
@@ -81,7 +81,7 @@ Orchestrator:
 | Phase | Agent | Context Loaded | Est. Tokens |
 |-------|-------|----------------|-------------|
 | Planning | Historian | Orientation + authority | 2,000 |
-| Execution | Engineer | Orientation + convoy + code | 5,000 |
+| Execution | Engineer | Orientation + epic + code | 5,000 |
 | **Total** | | | **7,000** |
 
 vs. Single Agent (everything): ~15,000-20,000 tokens
@@ -98,8 +98,8 @@ Use when gathering information from multiple independent sources.
 Human: "What's the current state of the project?"
 
 Orchestrator (parallel):
-  1. Query Beads for convoy status
-     bd list --type convoy --label "authority:granted"
+  1. Query Beads for epic status
+     bd list --type epic --status approved
 
   2. Invoke Engineer to summarize code state (read-only)
      Input: src/, tests/
@@ -128,7 +128,7 @@ Engineer executing plan:
   - Needs human decision
 
 Engineer:
-  1. HALT the convoy
+  1. HALT the epic
      bd update bd-XYZ --status halted --label halted:test-conflict
      bd comment bd-XYZ "HALTED: test_X fails. Need guidance."
 

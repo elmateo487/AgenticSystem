@@ -4,7 +4,11 @@
 
 ## Overview
 
-SYSTEM V1.3 integrates [Beads](https://github.com/steveyegge/beads) as its task management layer. Plans are Beads convoy issues. Tasks are child issues. Authority is enforced via labels and citations to authority documents.
+SYSTEM V1.3 integrates [Beads](https://github.com/steveyegge/beads) as its task management layer. Plans are Beads issues with type `epic`. Tickets and ACs are issues with type `task` that have a parent field set. Human invocation is the authority - when you invoke an agent, that is the authorization.
+
+**Beads Types**: `epic`, `task`, `blocker` (three distinct types - epics are NOT tasks)
+
+**Parent-Child Relationships**: Tasks with a `--parent` field set, not special "child" types
 
 **Core Principle**: Nothing runs unless explicitly invoked by a human. Beads provides structure; humans provide authorization.
 
@@ -29,12 +33,12 @@ SYSTEM V1.3 integrates [Beads](https://github.com/steveyegge/beads) as its task 
 │                     BEADS LAYER (database)                       │
 │  .beads/project.db (local)  +  .beads/beads.jsonl (git)        │
 │                                                                 │
-│  Convoy Issue = Plan                                            │
+│  Epic (type: epic) = Plan                                     │
 │    - description: Objective, Design, Scope, Criteria            │
 │    - authority_citations: ["INVARIANTS.md#Section", ...]        │
-│    - labels: authority:granted, scope:*, risk:*                 │
-│    └── Child Issues = Tasks                                     │
-│        - Flat structure (no sub-tasks)                          │
+│    - labels: scope:*, risk:*, feature:*, type:*                 │
+│    └── Tickets (type: task, with --parent bd-EPIC)              │
+│        └── ACs (type: task, with --parent bd-TICKET)            │
 │        - Dependencies via bd dep add                            │
 │                                                                 │
 └─────────────────────────────────────────────────────────────────┘
@@ -44,9 +48,9 @@ SYSTEM V1.3 integrates [Beads](https://github.com/steveyegge/beads) as its task 
 ┌─────────────────────────────────────────────────────────────────┐
 │                     ARCHIVE LAYER (files)                        │
 │  plans/archive/*.md                                             │
-│  - Exported via: bd show <convoy> --format markdown             │
+│  - Exported via: bd show <epic> --format markdown             │
 │  - Historical reference only                                    │
-│  - Created when convoy closes                                   │
+│  - Created when epic closes                                   │
 └─────────────────────────────────────────────────────────────────┘
 ```
 
@@ -96,34 +100,34 @@ DRAFT ──► PENDING_APPROVAL ──► APPROVED ──► IN_PROGRESS ──
 
 ### State Definitions
 
-| State | Labels | Meaning |
-|-------|--------|---------|
-| `draft` | `authority:pending` | Historian is creating the plan |
-| `pending_approval` | `authority:pending` | Ready for human review |
-| `approved` | `authority:granted` | Human approved, tasks can be claimed |
-| `in_progress` | `authority:granted` | At least one task claimed |
-| `suspended` | `authority:suspended` | Safety halt (system-triggered) - mutation detected, authority revoked |
-| `halted` | `authority:granted`, `halted:*` | Engineer halt - cannot proceed without human guidance, authority intact |
-| `pending_human_approval` | `authority:granted` | Engineer proved criteria met, awaiting human sign-off |
-| `completed` | `authority:granted`, `archived` | Human approved completion, plan closed |
-| `rejected` | - | Human rejected the plan |
-| `abandoned` | - | Plan discontinued before completion |
+| State | Meaning |
+|-------|---------|
+| `draft` | Historian is creating the plan |
+| `pending_approval` | Ready for human review |
+| `approved` | Human approved, tasks can be claimed |
+| `in_progress` | At least one task claimed |
+| `suspended` | Safety halt - work paused |
+| `halted` | Engineer halt - needs human guidance |
+| `pending_human_approval` | Engineer proved criteria met, awaiting human sign-off |
+| `completed` | Human approved completion |
+| `rejected` | Human rejected the plan |
+| `abandoned` | Plan discontinued before completion |
 
-**Note on `suspended`**: Suspension is a **safety mechanism**, not an authority action. It does not grant authority to do anything—it revokes the ability to proceed until human review. This preserves V1.2's principle that humans control all authority grants.
+**Note**: Human invocation is the authority. When you invoke an agent (e.g., `/engineer`), that is the authorization to proceed.
 
 ### Transitions
 
 | From | To | Trigger | Actor |
 |------|-----|---------|-------|
-| - | `draft` | `bd create --type convoy` | Historian |
+| - | `draft` | `bd create --type epic` | Historian |
 | `draft` | `pending_approval` | `bd update --status pending_approval` | Historian |
-| `pending_approval` | `approved` | `bd update --status approved --label authority:granted` | Human |
+| `pending_approval` | `approved` | `bd update --status approved` | Human |
 | `pending_approval` | `draft` | `bd update --status draft` (changes requested) | Human |
 | `pending_approval` | `rejected` | `bd update --status rejected` | Human |
 | `approved` | `in_progress` | First task claimed | Engineer |
 | `approved`/`in_progress` | `suspended` | Mutation detected (safety halt) | System |
 | `approved`/`in_progress` | `halted` | Engineer cannot proceed | Engineer |
-| `suspended` | `approved` | `bd update --label authority:granted` | Human |
+| `suspended` | `approved` | `bd update --status approved` | Human |
 | `halted` | `in_progress` | Human provides guidance, Engineer resumes | Human |
 | `in_progress` | `pending_human_approval` | All tasks done, tests pass | Engineer |
 | `pending_human_approval` | `completed` | Human approves | Human |
@@ -134,22 +138,19 @@ DRAFT ──► PENDING_APPROVAL ──► APPROVED ──► IN_PROGRESS ──
 
 ## Authority Model
 
-### Authority Grant
+### Human Invocation is Authority
 
-Authority is represented by the `authority:granted` label on a convoy issue.
+**Human invocation is the authority.** When you invoke an agent (e.g., `/engineer`), that is the authorization to proceed.
 
-**Requirements for authority:granted**:
-1. Convoy has `authority_citations` field with valid citations
-2. All cited sections exist in authority files
-3. Human explicitly added the label
+There are no authority labels. The act of invocation by a human grants authority for that specific work.
 
 ### Authority Citations
 
-Convoy issues must cite their authority:
+Epic issues must cite their authority:
 
 ```bash
 bd create "Feature X Implementation" \
-  --type convoy \
+  --type epic \
   --field "authority_citations=INVARIANTS.md#Section-Name,DECISIONS.md#2026-01-01---Decision-Title"
 ```
 
@@ -167,22 +168,19 @@ Suspension is a **safety halt**, not an authority action. It does not grant perm
 | Citation becomes invalid | Authority file section removed/renamed |
 
 **What happens on suspension**:
-1. System removes `authority:granted` label
-2. System adds `authority:suspended` label
-3. System adds comment explaining trigger
-4. **All work halts** - no tasks can be claimed or executed
-5. Human must review and explicitly re-approve to resume
+1. Epic status changes to `suspended`
+2. System adds comment explaining trigger
+3. **All work halts** - no tasks can be claimed or executed
+4. Human must review and explicitly re-approve to resume
 
-### Authority Verification (Engineer)
+### Starting Work (Engineer)
 
-Before executing any task:
+When invoked by a human, the Engineer:
 
 ```
-1. Get task's parent convoy
-2. Check convoy has label: authority:granted
-3. Check no children have status: needs_triage
-4. Check all authority_citations resolve to existing sections
-5. If any check fails: HALT and report
+1. Reads /tmp/work.json (pre-exported by Orchestrator)
+2. Reads authority docs if they exist
+3. Begins work on specified ticket/epic
 ```
 
 ---
@@ -233,15 +231,15 @@ Engineer must HALT and request human guidance when:
 **HALT procedure**:
 
 1. **Stop immediately** - Do not proceed with either a test change or a bad implementation
-2. **Move convoy to `halted` status with label**:
+2. **Move epic to `halted` status with label**:
    ```bash
    # If test seems wrong:
-   bd update bd-CONVOY --status halted --label "halted:test-conflict"
-   bd comment bd-CONVOY "HALTED: test_X fails. Test expects Y but implementation does Z. Need guidance on which is correct."
+   bd update bd-EPIC --status halted --label "halted:test-conflict"
+   bd comment bd-EPIC "HALTED: test_X fails. Test expects Y but implementation does Z. Need guidance on which is correct."
 
    # If implementation would need to worsen:
-   bd update bd-CONVOY --status halted --label "halted:arch-degradation"
-   bd comment bd-CONVOY "HALTED: test_X fails. Can only pass by [describe hack/degradation]. Need guidance on approach."
+   bd update bd-EPIC --status halted --label "halted:arch-degradation"
+   bd comment bd-EPIC "HALTED: test_X fails. Can only pass by [describe hack/degradation]. Need guidance on approach."
    ```
 3. **Wait for human decision** - Human can discover halted plans via:
    ```bash
@@ -254,8 +252,8 @@ Engineer must HALT and request human guidance when:
    - Adjusting acceptance criteria (plan scope change)
 5. **Human resumes work**:
    ```bash
-   bd update bd-CONVOY --status in_progress
-   bd comment bd-CONVOY "Guidance: [decision]. Resume work."
+   bd update bd-EPIC --status in_progress
+   bd comment bd-EPIC "Guidance: [decision]. Resume work."
    ```
 
 **Only humans can authorize test modifications or architectural compromises.**
@@ -270,7 +268,7 @@ Beads supports four dependency types:
 
 | Type | Command | Meaning | Use Case |
 |------|---------|---------|----------|
-| `parent-child` | `--parent bd-xyz` | Hierarchical containment | Convoy → Tasks |
+| `parent-child` | `--parent bd-xyz` | Hierarchical containment | Epic → Tasks |
 | `blocks` | `bd dep add A B --type blocks` | A must close before B starts | Task ordering |
 | `related` | `bd dep add A B --type related` | Informational link | Cross-references |
 | `discovered-from` | `--discovered-from bd-xyz` | Issue originated from task | Discovery tracking |
@@ -281,7 +279,7 @@ Plans can depend on other plans:
 
 ```bash
 # Task in Plan A blocks on Plan B completing
-bd dep add bd-PLAN-A-TASK bd-PLAN-B-CONVOY --type blocks
+bd dep add bd-PLAN-A-TASK bd-PLAN-B-EPIC --type blocks
 
 # Task in Plan A blocks on specific task in Plan B
 bd dep add bd-PLAN-A-TASK bd-PLAN-B-TASK --type blocks
@@ -295,8 +293,8 @@ bd dep add bd-PLAN-A-TASK bd-PLAN-B-TASK --type blocks
 ### Relationship Queries
 
 ```bash
-# Find all tasks blocked by a convoy
-bd dep tree bd-CONVOY
+# Find all tasks blocked by a epic
+bd dep tree bd-EPIC
 
 # Find what blocks a specific task
 bd show bd-TASK --json | jq '.blocked_by'
@@ -309,9 +307,9 @@ bd list --related-to bd-ISSUE
 
 ## Label Taxonomy
 
-### Required Labels (Convoy)
+### Required Labels (Epic)
 
-Every convoy (plan) **must** have these labels:
+Every epic (plan) **must** have these labels:
 
 | Prefix | Values | Description |
 |--------|--------|-------------|
@@ -325,22 +323,19 @@ Every convoy (plan) **must** have these labels:
 
 | Label | Set By | Meaning |
 |-------|--------|---------|
-| `authority:pending` | Historian | Awaiting approval |
-| `authority:granted` | Human | Approved for execution |
-| `authority:suspended` | System | Authority revoked - plan mutated, needs re-approval |
 | `halted:test-conflict` | Engineer | Blocked: test expects behavior implementation cannot provide |
 | `halted:arch-degradation` | Engineer | Blocked: test can only pass by worsening implementation |
 | `archived` | System | Plan completed and exported |
 
-**Note**: `halted:*` labels do NOT revoke authority. The plan is still valid; Engineer just needs guidance.
+**Note**: `halted:*` labels indicate Engineer needs guidance but plan is still valid.
 
-### Example Convoy Creation
+### Example Epic Creation
 
 ```bash
 bd create "Fix RASL Hybrid Seek Bug" \
-  --type convoy \
+  --type epic \
   --status draft \
-  --label "authority:pending" \
+   \
   --label "feature:rasl-repair" \
   --label "scope:services" \
   --label "type:bugfix" \
@@ -352,7 +347,7 @@ bd create "Fix RASL Hybrid Seek Bug" \
 
 ### Task Labels
 
-Tasks (children of convoy) **do not** have required labels. They inherit context from their parent convoy.
+Tasks (children of epic) **do not** have required labels. They inherit context from their parent epic.
 
 Optional task labels:
 - `blocked` - Manually mark as blocked (in addition to dep-based blocking)
@@ -361,31 +356,27 @@ Optional task labels:
 ### Label Validation
 
 Historian **must** verify before submitting for approval:
-1. All required label prefixes present on convoy
+1. All required label prefixes present on epic
 2. Values are from allowed set
-3. `authority:pending` label set
 
-Engineer **must** verify before claiming:
-1. Parent convoy has `authority:granted`
-2. No `authority:suspended` label
+Engineer works when invoked by human - no label verification needed.
 
 ### Querying by Labels
 
 ```bash
 # Find all plans for a feature
-bd list --type convoy --label "feature:rasl-repair"
+bd list --type epic --label "feature:rasl-repair"
 
 # Find high-priority bugfixes
-bd list --type convoy --label "type:bugfix" --label "priority:high"
+bd list --type epic --label "type:bugfix" --label "priority:high"
 
 # Find approved plans ready for work
-bd list --type convoy --label "authority:granted"
-
+bd list --type epic 
 # Find suspended plans needing attention
-bd list --type convoy --label "authority:suspended"
+bd list --type epic --label "authority:suspended"
 
 # Find all work in a scope area
-bd list --type convoy --label "scope:services"
+bd list --type epic --label "scope:services"
 ```
 
 ---
@@ -411,10 +402,10 @@ Human: "Execute plan X"
 
 ### Historian
 
-**Role**: Create and maintain plans (convoy issues) in Beads.
+**Role**: Create and maintain plans (epic issues) in Beads.
 
 **Commands used**:
-- `bd create` - Create convoy and task issues
+- `bd create` - Create epic and task issues
 - `bd update` - Move to pending_approval
 - `bd comment` - Add worklog entries
 - `bd show` - Export to markdown on archive
@@ -422,51 +413,69 @@ Human: "Execute plan X"
 **Workflow**:
 ```
 1. Research problem (read code, understand scope)
-2. Create convoy issue with:
+2. Create epic issue with:
    - Title
    - Description (objective, design, scope, criteria)
-   - authority_citations field
-   - authority:pending label
+   - Required labels (feature, scope, type, risk, priority)
 3. Create task issues as children
 4. Add dependencies between tasks (bd dep add)
-5. Move convoy to pending_approval
+5. Move epic to pending_approval
 6. Wait for human approval
 ```
 
-**Example**:
+**Example** (3-level hierarchy):
 ```bash
-# Create plan (convoy)
+# Level 1: Create epic with CONTEXT only (no AC checkboxes)
 bd create "RASL Hybrid Seek Fix" \
-  --type convoy \
+  --type epic \
   --status draft \
-  --label "authority:pending" \
+   \
   --field "authority_citations=INVARIANTS.md#DV-Frame-Exact,DECISIONS.md#Hybrid-Cutting" \
-  --description "## Objective
-Fix the hybrid seeking bug...
+  --description "## Problem Statement
+Hybrid seeking bug causes frame leakage at cut boundaries.
 
-## Technical Design
-Replace FFmpeg hybrid seek with mkvmerge...
+## Technical Context
+FFmpeg hybrid seek has known issues with certain codecs.
+mkvmerge provides more reliable extraction.
 
-## Scope
-- Included: video_repair_service.py
-- Excluded: GUI
+## Design Rationale
+Replace FFmpeg with mkvmerge for extraction phase."
 
-## Acceptance Criteria
-- No nudity at clean 6775s
-- Frame count validation passes"
+# Level 2: Create tickets with INSTRUCTIONS
+bd create "Implement mkvmerge extraction" --parent bd-EPIC --priority 1 \
+  --description "## Implementation
+- Replace FFmpeg extraction with mkvmerge
+- Update video_repair_service.py
 
-# Create tasks
-bd create "Create test fixture" --parent bd-CONVOY --priority 1
-bd create "Implement mkvmerge extraction" --parent bd-CONVOY --priority 2
-bd create "Validate with test case" --parent bd-CONVOY --priority 3
+## Files to Modify
+- src/services/video_repair_service.py"
 
-# Add dependencies
-bd dep add bd-TASK2 bd-TASK1 --type blocks
-bd dep add bd-TASK3 bd-TASK2 --type blocks
+# Level 3: Create ACs as tasks with --parent (NOT checkboxes in descriptions)
+bd create "No curated frames in clean output at 6775s" --parent bd-TICKET1 --priority 1
+bd create "Frame count validation passes" --parent bd-TICKET1 --priority 2
+bd create "Add unit tests for edge cases" --parent bd-TICKET1 --priority 3
+
+bd create "Create test fixture" --parent bd-EPIC --priority 2
+bd create "Validate with full test suite" --parent bd-EPIC --priority 3
+
+# Add dependencies between tickets
+bd dep add bd-TICKET2 bd-TICKET1 --type blocks
+bd dep add bd-TICKET3 bd-TICKET2 --type blocks
 
 # Submit for approval
-bd update bd-CONVOY --status pending_approval
+bd update bd-EPIC --status pending_approval
 ```
+
+**3-Level Hierarchy Rule**:
+| Level | Beads Type | Contains | Has Children |
+|-------|------------|----------|--------------|
+| 1 | `epic` | Problem context, rationale | Yes (tickets) |
+| 2 | `task` | Implementation details | Yes (ACs) |
+| 3 | `task` | Single actionable task | **No** (leaf node) |
+
+**Note**: Both tickets (level 2) and ACs (level 3) use Beads type `task`. The hierarchy is created via the `--parent` field, not via different types.
+
+**Rule**: Acceptance Criteria (level 3) are leaf nodes - no further nesting, no checkboxes in descriptions.
 
 ### Engineer
 
@@ -483,15 +492,15 @@ bd update bd-CONVOY --status pending_approval
 **Workflow**:
 ```
 1. Human says "work on plan X" or "what's next?"
-2. bd ready --parent bd-CONVOY --limit 1
-3. Verify authority (check convoy labels + citations)
+2. bd ready --parent bd-EPIC --limit 1
+3. Verify authority (check epic labels + citations)
 4. bd update bd-TASK --claim engineer-id
 5. Execute the work
 6. If discovery: bd create --status needs_triage --discovered-from bd-TASK
 7. bd close bd-TASK --reason "Completed"
 8. When ALL tasks done:
    a. Write new tests or run existing tests to prove acceptance criteria
-   b. If tests pass: bd update bd-CONVOY --status pending_human_approval
+   b. If tests pass: bd update bd-EPIC --status pending_human_approval
    c. If tests fail: Fix implementation (NOT the tests) or HALT for human
 ```
 
@@ -547,17 +556,17 @@ When an Engineer discovers new work during execution:
 
 1. **Create issue** with `--status needs_triage`
 2. **Link** to source task with `--discovered-from`
-3. **Authority suspended** on convoy (automatic)
+3. **Authority suspended** on epic (automatic)
 4. **Work pauses** until human triages
 
 **Human triage options**:
-- Add to current plan: `bd update bd-NEW --parent bd-CONVOY --status approved`
-- Create new plan: Historian creates separate convoy
+- Add to current plan: `bd update bd-NEW --parent bd-EPIC --status approved`
+- Create new plan: Historian creates separate epic
 - Dismiss: `bd close bd-NEW --reason "Not needed"`
 - Workaround: `bd close bd-NEW --reason "Workaround: ..."`
 
 After triage, if no `needs_triage` children remain:
-- Human re-approves: `bd update bd-CONVOY --label authority:granted`
+- Human re-approves: `bd update bd-EPIC --status approved`
 
 ---
 
@@ -575,8 +584,8 @@ When all tasks are complete, Engineer must:
 3. Confirm no regressions or unintended changes
 4. Move to pending_human_approval:
    ```bash
-   bd update bd-CONVOY --status pending_human_approval
-   bd comment bd-CONVOY "All tasks complete. Tests pass. Ready for human approval."
+   bd update bd-EPIC --status pending_human_approval
+   bd comment bd-EPIC "All tasks complete. Tests pass. Ready for human approval."
    ```
 
 **Test Integrity Rule**: Tests may NOT be disabled, loosened, bypassed, gutted, or skipped to make them pass. If a test cannot pass with the current implementation, the Engineer must HALT and request human guidance.
@@ -586,17 +595,17 @@ When all tasks are complete, Engineer must:
 Human reviews Engineer's work and either:
 ```bash
 # Approve - plan is complete
-bd update bd-CONVOY --status completed
+bd update bd-EPIC --status completed
 
 # Reject - needs more work
-bd update bd-CONVOY --status suspended --label authority:suspended
-bd comment bd-CONVOY "Issues found: [describe problems]"
+bd update bd-EPIC --status suspended --label authority:suspended
+bd comment bd-EPIC "Issues found: [describe problems]"
 ```
 
 **Step 3: Archive (after completion)**
 
-1. **Export to archive**: `bd show bd-CONVOY --format markdown > plans/archive/convoy-title.md`
-2. **Add archived label**: `bd update bd-CONVOY --label archived`
+1. **Export to archive**: `bd show bd-EPIC --format markdown > plans/archive/epic-title.md`
+2. **Add archived label**: `bd update bd-EPIC --label archived`
 
 ### Test Failure During Completion
 
@@ -611,12 +620,12 @@ If tests fail when Engineer attempts to prove criteria:
 
 ```bash
 # Test seems wrong - move to halted status:
-bd update bd-CONVOY --status halted --label "halted:test-conflict"
-bd comment bd-CONVOY "HALTED: Test X fails. Test expects A but implementation does B. Requesting guidance."
+bd update bd-EPIC --status halted --label "halted:test-conflict"
+bd comment bd-EPIC "HALTED: Test X fails. Test expects A but implementation does B. Requesting guidance."
 
 # Implementation would need to worsen - move to halted status:
-bd update bd-CONVOY --status halted --label "halted:arch-degradation"
-bd comment bd-CONVOY "HALTED: Test X fails. Can only pass by [describe degradation]. Requesting guidance on approach."
+bd update bd-EPIC --status halted --label "halted:arch-degradation"
+bd comment bd-EPIC "HALTED: Test X fails. Can only pass by [describe degradation]. Requesting guidance on approach."
 ```
 
 **Human discovers halted plans**: `bd list --status halted`
@@ -658,16 +667,15 @@ plans/archive/
 **Recovery**:
 ```bash
 # 1. Identify invalid citation
-bd show bd-CONVOY --json | jq '.fields.authority_citations'
+bd show bd-EPIC --json | jq '.fields.authority_citations'
 
 # 2. Human decides:
 #    a) Update authority doc to restore section
-#    b) Update convoy with new valid citation
-bd update bd-CONVOY --field "authority_citations=INVARIANTS.md#New-Section"
+#    b) Update epic with new valid citation
+bd update bd-EPIC --field "authority_citations=INVARIANTS.md#New-Section"
 
 # 3. Re-approve
-bd update bd-CONVOY --label "authority:granted"
-```
+bd update bd-EPIC ```
 
 #### Authority Suspended Mid-Execution
 
@@ -680,13 +688,12 @@ bd update bd-CONVOY --label "authority:granted"
 # 1. Engineer halts current work (don't commit incomplete changes)
 
 # 2. Identify suspension reason
-bd show bd-CONVOY  # Check for authority:suspended, needs_triage children
+bd show bd-EPIC  # Check for authority:suspended, needs_triage children
 
 # 3. Human reviews and either:
 #    a) Approves the mutation
-bd update bd-CONVOY --label "authority:granted"
-#    b) Reverts the mutation
-bd update bd-CONVOY --description "original description..."
+bd update bd-EPIC #    b) Reverts the mutation
+bd update bd-EPIC --description "original description..."
 bd close bd-NEW-TASK --reason "Rejected"
 ```
 
@@ -703,8 +710,8 @@ bd close bd-NEW-TASK --reason "Rejected"
 # 4. Unclaim the task (return to ready pool)
 bd update bd-TASK --status ready --assignee ""
 
-# 5. Wait for human to resolve authority issue
-# 6. Re-claim when authority:granted restored
+# 5. Wait for human to resolve issue
+# 6. Re-claim when human re-invokes
 ```
 
 ### Human Interaction Failures
@@ -718,19 +725,18 @@ bd update bd-TASK --status ready --assignee ""
 **Recovery**:
 ```bash
 # Option 1: Human approves
-bd update bd-CONVOY --status approved --label "authority:granted"
-
+bd update bd-EPIC --status approved 
 # Option 2: Human requests changes
-bd comment bd-CONVOY "Need to clarify scope for X"
-bd update bd-CONVOY --status draft
+bd comment bd-EPIC "Need to clarify scope for X"
+bd update bd-EPIC --status draft
 
 # Option 3: Human rejects
-bd close bd-CONVOY --reason "Not needed / out of scope"
+bd close bd-EPIC --reason "Not needed / out of scope"
 ```
 
-**Prevention**: Orchestrator can surface stale pending_approval convoys:
+**Prevention**: Orchestrator can surface stale pending_approval epics:
 ```bash
-bd list --type convoy --status pending_approval
+bd list --type epic --status pending_approval
 ```
 
 #### Discoveries Never Triaged
@@ -742,19 +748,18 @@ bd list --type convoy --status pending_approval
 **Recovery**:
 ```bash
 # 1. List untriaged discoveries
-bd list --status needs_triage --parent bd-CONVOY
+bd list --status needs_triage --parent bd-EPIC
 
 # 2. For each, human decides:
 #    a) Add to plan
 bd update bd-DISCOVERY --status approved
 #    b) Defer to new plan
-bd update bd-DISCOVERY --parent ""  # Remove from this convoy
+bd update bd-DISCOVERY --parent ""  # Remove from this epic
 #    c) Dismiss
 bd close bd-DISCOVERY --reason "Won't fix / duplicate / not needed"
 
 # 3. Once all triaged, restore authority
-bd update bd-CONVOY --label "authority:granted"
-```
+bd update bd-EPIC ```
 
 **Prevention**: Limit discovery creation per task. If too many discoveries, halt and escalate.
 
@@ -769,7 +774,7 @@ bd update bd-CONVOY --label "authority:granted"
 **Recovery**:
 ```bash
 # 1. Identify affected plans
-bd list --type convoy --label "authority:granted" | while read id; do
+bd list --type epic --status approved | while read id; do
   # Check each plan's citations
   bd show $id --json | jq '.fields.authority_citations'
 done
@@ -779,7 +784,7 @@ done
 #    b) Or acknowledge the authority doc change invalidates the plan
 
 # 3. Re-approve valid plans
-bd update bd-CONVOY --label "authority:granted"
+bd update bd-EPIC --status approved
 ```
 
 **Prevention**: Authority docs should be changed rarely. Consider requiring plan review before authority doc changes.
@@ -788,12 +793,12 @@ bd update bd-CONVOY --label "authority:granted"
 
 | Situation | Command |
 |-----------|---------|
-| Check why suspended | `bd show bd-CONVOY` |
-| List needs_triage | `bd list --status needs_triage --parent bd-CONVOY` |
-| Restore authority | `bd update bd-CONVOY --label "authority:granted"` |
+| Check why suspended | `bd show bd-EPIC` |
+| List needs_triage | `bd list --status needs_triage --parent bd-EPIC` |
+| Resume work | `bd update bd-EPIC --status approved` |
 | Unclaim task | `bd update bd-TASK --status ready --assignee ""` |
 | Close discovery | `bd close bd-DISCOVERY --reason "..."` |
-| List stale plans | `bd list --type convoy --status pending_approval` |
+| List stale plans | `bd list --type epic --status pending_approval` |
 
 ---
 
@@ -820,7 +825,7 @@ This creates:
 ### Required Beads version
 
 V1.3 requires Beads v0.42.0+ for:
-- Convoy issues (auto-close when children done)
+- Epic issues (auto-close when children done)
 - Atomic claiming (`--claim`)
 - State management
 
@@ -832,13 +837,13 @@ Projects migrating from V1.2 markdown plans:
 
 1. **Keep authority files** - No change to INVARIANTS.md, DECISIONS.md
 2. **Initialize Beads** - `bd init --prefix project`
-3. **Import active plans** - Create convoy issues from existing plans/active/*.md
+3. **Import active plans** - Create epic issues from existing plans/active/*.md
 4. **Archive old plans** - Move plans/active/*.md to plans/archive/ (historical reference)
-5. **Update CLAUDE.md** - Reference V1.3 orientation
+5. **Update CLAUDE.md** - Reference V1.3 skills
 
 **Active plan migration**:
 ```bash
-# For each active plan, create convoy + tasks in Beads
+# For each active plan, create epic + tasks in Beads
 # Then archive the markdown file
 mv plans/active/PLAN-X.md plans/archive/migrated-PLAN-X.md
 ```
@@ -863,6 +868,7 @@ These commands are executed by the human directly in terminal:
 | `bd update <id> --status in_progress` | Resume halted plan | After providing guidance |
 | `bd update <id> --status rejected` | Reject plan | Plan needs revision |
 | `bd close <id> --reason "..."` | Close issue | Dismissing discoveries, completing work |
+| `bd close $(bd list --parent <epic> --json \| jq -r '.[].id') <epic> --reason "..."` | Close epic AND all children | Closing entire plan (beads does not cascade) |
 | `bd comment <id> "..."` | Add comment | Providing feedback, notes |
 | `bd dep tree <id>` | View dependency graph | Understanding blockers |
 
@@ -872,8 +878,8 @@ These commands are invoked by agents (Historian, Engineer) on behalf of the huma
 
 | Command | Purpose | Which Agent |
 |---------|---------|-------------|
-| `bd create --type convoy ...` | Create new plan | Historian |
-| `bd create --parent <convoy> ...` | Create task under plan | Historian |
+| `bd create --type epic ...` | Create new plan | Historian |
+| `bd create --parent <epic> ...` | Create task under plan | Historian |
 | `bd dep add <from> <to> --type blocks` | Add dependency | Historian |
 | `bd update <id> --status ready` | Mark task ready for work | Historian |
 | `bd update <id> --status in_progress --claim` | Claim and start work | Engineer |
@@ -887,13 +893,12 @@ These commands are invoked by agents (Historian, Engineer) on behalf of the huma
 ```
 Human: "Plan a new feature for X"
     └── Orchestrator invokes Historian
-        └── Historian: bd create --type convoy "Feature X plan"
+        └── Historian: bd create --type epic "Feature X plan"
         └── Historian: bd create --parent bd-001 "Task 1"
         └── Historian: bd create --parent bd-001 "Task 2"
         └── Historian: bd update bd-001 --status pending_approval
 Human: "Looks good, approved"
-    └── Human: bd update bd-001 --status approved --label authority:granted
-Human: "Execute the plan"
+    └── Human: bd update bd-001 --status approved Human: "Execute the plan"
     └── Orchestrator invokes Engineer
         └── Engineer: bd ready --parent bd-001
         └── Engineer: bd update bd-002 --status in_progress --claim
@@ -911,8 +916,8 @@ Human: (reviews Engineer's work)
 
 | Concept | V1.2 | V1.3 |
 |---------|------|------|
-| Plan storage | Markdown files | Beads convoy issues |
-| Task tracking | Checkboxes | Beads child issues |
+| Plan storage | Markdown files | Beads epic issues |
+| Task tracking | Checkboxes | Beads tasks (type: task with --parent) |
 | Authority grant | Text in file | Label on issue |
 | Progress | Worklog in file | Comments on issue |
 | Dependencies | Implicit ordering | Explicit `bd dep add` |

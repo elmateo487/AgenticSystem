@@ -3,10 +3,10 @@
 ## [1.3.0] - 2026-01-09
 
 ### Added
-- **Beads Integration**: Plans now use Beads convoy issues instead of markdown files
+- **Beads Integration**: Plans now use Beads epic issues instead of markdown files
 - **Test Integrity**: New core principle - tests are sacrosanct, implementation quality is sacrosanct
 - **HALT Protocol**: Engineers halt and escalate when tests cannot pass without compromise
-- **Convoy workflow**: draft → pending_approval → approved → in_progress → pending_human_approval → completed
+- **Epic workflow**: draft → pending_approval → approved → in_progress → pending_human_approval → completed
 - **Authority states**: suspended (system-triggered), halted (engineer-triggered)
 - **Discovery issues**: Surface out-of-scope work without blocking execution
 
@@ -19,8 +19,8 @@
 
 ### Removed
 - Notion Assistant (all related files)
-- Extended orientation files (consolidated into main orientations)
-- File-based plan templates (replaced by Beads convoy structure)
+- Orientation files (consolidated into skills at ~/.claude/skills/)
+- File-based plan templates (replaced by Beads epic structure)
 - Plan index generation (replaced by Beads queries)
 - Authority summary templates (over-engineering removed)
 

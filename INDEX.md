@@ -9,25 +9,15 @@
 | `MIGRATION_PLAN.md` | V1.2 to V1.3 migration plan |
 | `CHANGELOG.md` | Version history (TODO) |
 
-## Orientation Files
+## Agent Skills
 
-Quick-reference guides for agents. Read these first.
+Agent definitions are consolidated into skills at `~/.claude/skills/`:
 
-| File | Agent | Lines |
-|------|-------|-------|
-| `orientation/HISTORIAN_ORIENTATION.md` | Historian | Plan creation, Beads convoys |
-| `orientation/ENGINEER_ORIENTATION.md` | Engineer | Plan execution, test integrity |
-| `orientation/ORCHESTRATOR_ORIENTATION.md` | Orchestrator | Agent dispatch, coordination |
-
-## Agent Specifications
-
-Full agent specifications with detailed behavior.
-
-| File | Lines | Description |
-|------|-------|-------------|
-| `agents/HISTORIAN_AGENT.md` | 241 | Full Historian spec |
-| `agents/ENGINEER_AGENT.md` | 259 | Full Engineer spec |
-| `agents/ORCHESTRATOR_AGENT.md` | 272 | Full Orchestrator spec |
+| Skill | Purpose |
+|-------|---------|
+| `/engineer` | Execute approved plans (code, tests, implementation) |
+| `/historian` | Create plans (Beads epics), maintain authority documents |
+| `/orchestrator` | Re-orient when context is lost |
 
 ## Documentation
 
@@ -53,7 +43,7 @@ Templates for project authority documents.
 
 | File | Lines | Description |
 |------|-------|-------------|
-| `examples/CONVOY_EXAMPLE.md` | 258 | Complete Beads convoy workflow example |
+| `examples/EPIC_EXAMPLE.md` | 258 | Complete Beads epic workflow example |
 | `examples/INVARIANTS_EXAMPLE.md` | 41 | Example INVARIANTS.md |
 | `examples/DECISIONS_EXAMPLE.md` | 54 | Example DECISIONS.md |
 
@@ -62,9 +52,8 @@ Templates for project authority documents.
 | Category | Complete | TODO |
 |----------|----------|------|
 | Root | 3 | 1 |
-| Orientation | 3 | 0 |
-| Agents | 3 | 0 |
+| Skills | 3 | 0 |
 | Docs | 3 | 0 |
 | Templates | 5 | 0 |
 | Examples | 3 | 0 |
-| **Total** | **20** | **1** |
+| **Total** | **17** | **1** |

@@ -39,7 +39,7 @@ Project-wide
 File-based plans in `plans/active/` require manual status tracking and don't support concurrent work well.
 
 **Decision**
-Migrate to Beads convoy issues for plan management. Authority documents remain file-based.
+Migrate to Beads epic issues for plan management. Authority documents remain file-based.
 
 **Alternatives**
 - A: Keep file-based plans (rejected: poor concurrent support)

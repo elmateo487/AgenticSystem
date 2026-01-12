@@ -6,8 +6,8 @@
 | Item | Reason |
 |------|--------|
 | Notion Assistant (all files) | Not part of V1.3 scope |
-| Extended orientation files | Consolidated into main orientations + BEADS_INTEGRATION.md |
-| IMPLEMENTATION_PLAN_TEMPLATE.md | Replaced by Beads convoy creation |
+| Extended orientation files | Consolidated into skills (~/.claude/skills/) |
+| IMPLEMENTATION_PLAN_TEMPLATE.md | Replaced by Beads epic creation |
 | PLAN_INDEX_TEMPLATE.md | Plans are now Beads queries, not index files |
 | PLAN_INDEX_GENERATION.md | Same reason |
 | AUTHORITY_SUMMARY_TEMPLATE.md | Over-engineering; read full docs |
@@ -45,51 +45,47 @@
 
 ```
 system-v1.3/
-├── README.md                    # NEW - entry point
-├── INDEX.md                     # NEW - file index
-├── CHANGELOG.md                 # NEW - version history
-│
-├── orientation/                 # Agent quick-reference (DONE)
-│   ├── HISTORIAN_ORIENTATION.md     ✓
-│   ├── ENGINEER_ORIENTATION.md      ✓
-│   └── ORCHESTRATOR_ORIENTATION.md  ✓
-│
-├── agents/                      # Full agent specifications
-│   ├── HISTORIAN_AGENT.md           TODO - adapt from V1.2
-│   ├── ENGINEER_AGENT.md            TODO - adapt from V1.2
-│   └── ORCHESTRATOR_AGENT.md        TODO - adapt from V1.2
+├── README.md                    # Entry point
+├── INDEX.md                     # File index
+├── CHANGELOG.md                 # Version history
 │
 ├── templates/                   # Authority & architecture templates
-│   ├── INVARIANTS_TEMPLATE.md       TODO - copy from V1.2
-│   ├── DECISIONS_TEMPLATE.md        TODO - copy from V1.2
-│   ├── ARCHITECTURE_TEMPLATE.md     TODO - copy from V1.2
-│   ├── PIPELINE_TEMPLATE.md         TODO - copy from V1.2
-│   └── AUTHORITY_CHANGELOG_TEMPLATE.md  TODO - copy from V1.2
+│   ├── INVARIANTS_TEMPLATE.md       ✓
+│   ├── DECISIONS_TEMPLATE.md        ✓
+│   ├── ARCHITECTURE_TEMPLATE.md     ✓
+│   ├── PIPELINE_TEMPLATE.md         ✓
+│   └── AUTHORITY_CHANGELOG_TEMPLATE.md  ✓
 │
 ├── docs/                        # Design documentation
 │   ├── BEADS_INTEGRATION.md         ✓ (the V1.3 design doc)
 │   ├── BEADS_INTEGRATION_AUDIT.md   ✓
-│   └── SUB_AGENT_PATTERNS.md        TODO - adapt from V1.2
+│   └── SUB_AGENT_PATTERNS.md        ✓
 │
 └── examples/                    # Beads-based examples
-    ├── CONVOY_EXAMPLE.md            TODO - NEW for V1.3
-    ├── INVARIANTS_EXAMPLE.md        TODO - copy from V1.2
-    └── DECISIONS_EXAMPLE.md         TODO - copy from V1.2
+    ├── EPIC_EXAMPLE.md              ✓
+    ├── INVARIANTS_EXAMPLE.md        ✓
+    └── DECISIONS_EXAMPLE.md         ✓
+
+~/.claude/skills/               # Agent skills (global)
+├── engineer/SKILL.md               ✓
+├── historian/SKILL.md              ✓
+└── orchestrator/SKILL.md           ✓
 ```
+
+**Note**: orientation/ directory removed. Agent definitions consolidated into skills at ~/.claude/skills/.
 
 ---
 
 ## Ordered Work
 
 ### Phase 1: Foundation (Priority: High)
-- [x] Create orientation files (DONE)
 - [x] Create README.md - system overview and quick start
 - [x] Create INDEX.md - file listing with descriptions
 
 ### Phase 2: Agent Specs (Priority: High)
-- [x] Create agents/HISTORIAN_AGENT.md - adapt from V1.2, remove Obsidian references
-- [x] Create agents/ENGINEER_AGENT.md - adapt from V1.2, add Test Integrity, Beads commands
-- [x] Create agents/ORCHESTRATOR_AGENT.md - adapt from V1.2, add Beads read-only commands
+- [x] Create agent skills at ~/.claude/skills/
+- [x] Consolidate orientation content into skill files
+- [x] Remove orientation/ directory
 
 ### Phase 3: Templates (Priority: Medium)
 - [x] Copy templates/INVARIANTS_TEMPLATE.md - updated header to V1.3
@@ -100,14 +96,14 @@ system-v1.3/
 
 ### Phase 4: Docs & Examples (Priority: Low)
 - [x] Adapt docs/SUB_AGENT_PATTERNS.md for Beads
-- [x] Create examples/CONVOY_EXAMPLE.md - show Beads convoy workflow
+- [x] Create examples/EPIC_EXAMPLE.md - show Beads epic workflow
 - [x] Copy examples/INVARIANTS_EXAMPLE.md
 - [x] Copy examples/DECISIONS_EXAMPLE.md
 
 ### Phase 5: Finalize
-- [ ] Create CHANGELOG.md
-- [ ] Review all files for V1.2 references
-- [ ] Initialize git repo and commit
+- [x] Create CHANGELOG.md
+- [x] Review all files for V1.2 references (appropriate references kept)
+- [x] Commit to existing git repo (b7e40f6)
 
 ---
 
@@ -115,12 +111,11 @@ system-v1.3/
 
 | Category | V1.2 | V1.3 | Delta |
 |----------|------|------|-------|
-| Orientation | 8 | 3 | -5 (removed extended + Notion) |
-| Agents | 4 | 3 | -1 (removed Notion) |
+| Skills | 0 | 3 | +3 (in ~/.claude/skills/) |
 | Templates | 10 | 5 | -5 (removed plan/summary templates) |
 | Docs | 5 | 3 | -2 (removed metrics/caching) |
 | Examples | 6 | 3 | -3 (removed Notion + consolidated) |
 | Root | 4 | 3 | -1 |
-| **Total** | **37** | **20** | **-17** |
+| **Total** | **37** | **14** | **-23** |
 
-V1.3 is leaner by design. Beads handles what file-based plans used to do.
+V1.3 is leaner by design. Beads epics handle what file-based plans used to do. Skills at ~/.claude/skills/ are the single source of truth for each agent.

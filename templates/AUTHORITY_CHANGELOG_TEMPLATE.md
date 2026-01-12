@@ -46,4 +46,4 @@ Format:
 Do NOT include:
 - Typo fixes that don't change meaning
 - Formatting-only changes
-- Implementation status updates (those go in Beads convoy comments)
+- Implementation status updates (those go in Beads epic comments)

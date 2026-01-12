@@ -23,4 +23,4 @@ This document does not grant authority.
 - <what is validated where>
 
 ## History
-- Links to archived plans (Beads convoys) introducing stages
+- Links to archived plans (Beads epics) introducing stages
