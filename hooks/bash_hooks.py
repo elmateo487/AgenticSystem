@@ -725,7 +725,7 @@ def check_system_temp(command: str) -> Optional[str]:
 
 
 # =============================================================================
-# POST-TOOL-USE: AUTO-BLOCK ON DEPENDENCY
+# POST-TOOL-USE: AUTO-ACTIONS AFTER COMMANDS
 # =============================================================================
 
 
@@ -740,6 +740,44 @@ def parse_bd_dep_blocks(command: str) -> Optional[str]:
     return None
 
 
+def is_hard_delete(command: str) -> bool:
+    """Check if command is 'bd delete ... --hard'."""
+    if not re.match(r"^\s*bd\s+delete\b", command):
+        return False
+    return "--hard" in command
+
+
+def run_purge_cleanup():
+    """Run cleanup after hard delete: compact, rebuild DB, sync."""
+    project_root = get_project_root()
+    if not project_root:
+        return
+
+    beads_dir = Path(project_root) / ".beads"
+    db_path = beads_dir / "beads.db"
+    jsonl_path = beads_dir / "issues.jsonl"
+
+    # Step 1: Purge tombstones
+    code, _, _ = run_bd_command(["admin", "compact", "--purge-tombstones"])
+    if code == 0:
+        print("AUTO: Purged tombstones", file=sys.stderr)
+
+    # Step 2: Rebuild DB from clean JSONL (prevents git resurrection)
+    if db_path.exists() and jsonl_path.exists():
+        try:
+            db_path.unlink()
+            code, _, _ = run_bd_command(["import", "-i", str(jsonl_path), "--no-git-history"])
+            if code == 0:
+                print("AUTO: Rebuilt DB from JSONL", file=sys.stderr)
+        except Exception as e:
+            print(f"AUTO: DB rebuild failed: {e}", file=sys.stderr)
+
+    # Step 3: Sync
+    code, _, _ = run_bd_command(["sync"])
+    if code == 0:
+        print("AUTO: Synced", file=sys.stderr)
+
+
 def handle_post_tool_use(command: str):
     """Handle PostToolUse events - auto-actions after commands complete."""
     # Auto-block when dependency created with --blocks
@@ -751,6 +789,10 @@ def handle_post_tool_use(command: str):
             success = update_issue_status(blocked_id, "blocked")
             if success:
                 print(f"AUTO: Set {blocked_id} to blocked (dependency created)", file=sys.stderr)
+
+    # Auto-purge after hard delete
+    if is_hard_delete(command):
+        run_purge_cleanup()
 
 
 # =============================================================================
