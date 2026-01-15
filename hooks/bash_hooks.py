@@ -748,34 +748,10 @@ def is_hard_delete(command: str) -> bool:
 
 
 def run_purge_cleanup():
-    """Run cleanup after hard delete: compact, rebuild DB, sync."""
-    project_root = get_project_root()
-    if not project_root:
-        return
-
-    beads_dir = Path(project_root) / ".beads"
-    db_path = beads_dir / "beads.db"
-    jsonl_path = beads_dir / "issues.jsonl"
-
-    # Step 1: Purge tombstones
+    """Run cleanup after hard delete: compact to purge tombstones."""
     code, _, _ = run_bd_command(["admin", "compact", "--purge-tombstones"])
     if code == 0:
         print("AUTO: Purged tombstones", file=sys.stderr)
-
-    # Step 2: Rebuild DB from clean JSONL (prevents git resurrection)
-    if db_path.exists() and jsonl_path.exists():
-        try:
-            db_path.unlink()
-            code, _, _ = run_bd_command(["import", "-i", str(jsonl_path), "--no-git-history"])
-            if code == 0:
-                print("AUTO: Rebuilt DB from JSONL", file=sys.stderr)
-        except Exception as e:
-            print(f"AUTO: DB rebuild failed: {e}", file=sys.stderr)
-
-    # Step 3: Sync
-    code, _, _ = run_bd_command(["sync"])
-    if code == 0:
-        print("AUTO: Synced", file=sys.stderr)
 
 
 def handle_post_tool_use(command: str):
