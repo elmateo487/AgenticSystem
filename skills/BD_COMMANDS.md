@@ -9,7 +9,7 @@ All rules below are enforced by PreToolUse hooks. Violations are **blocked**.
 | Command | Why Blocked |
 |---------|-------------|
 | `bd ready` | Humans choose work, not agents |
-| `bd delete X` | Must use `bd delete X --hard --force` |
+| `bd delete X` | Must use `--hard --force`, and `--cascade` if has children |
 | `bd create "Title"` | Must include type label |
 | `bd create --label "type:ac"` | AC must have `--parent TICKET_ID` |
 | `bd create --label "type:epic"` | Must also include `--type epic` |

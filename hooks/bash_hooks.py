@@ -230,17 +230,32 @@ def check_bd_command_guard(command: str) -> Optional[str]:
     if re.match(r"^\s*bd\s+ready\b", command):
         return "BLOCKED: `bd ready` is not permitted\nOnly humans choose what work to execute next."
 
-    # Block: bd delete without --hard --force
+    # Block: bd delete without --hard --force, and require --cascade if has children
     if re.match(r"^\s*bd\s+delete\b", command):
         has_hard = "--hard" in command
         has_force = "--force" in command
+        has_cascade = "--cascade" in command
+
+        # Check required flags
         if not has_hard or not has_force:
             missing = []
             if not has_hard:
                 missing.append("--hard")
             if not has_force:
                 missing.append("--force")
-            return f"BLOCKED: `bd delete` requires {' and '.join(missing)}\nUsage: bd delete $ISSUE_ID --hard --force"
+            return f"BLOCKED: `bd delete` requires {' and '.join(missing)}\nUsage: bd delete $ISSUE_ID --hard --force --cascade"
+
+        # Check for children - require --cascade if any exist
+        if not has_cascade:
+            issue_id = parse_issue_id_from_command(command, "delete")
+            if issue_id:
+                children = get_issue_children(issue_id)
+                if children:
+                    return (
+                        f"BLOCKED: {issue_id} has {len(children)} children\n"
+                        "Use --cascade to delete with all children:\n"
+                        f"  bd delete {issue_id} --hard --force --cascade"
+                    )
 
     # Block: bd update --status validations
     if re.match(r"^\s*bd\s+update\b", command):
@@ -740,11 +755,9 @@ def parse_bd_dep_blocks(command: str) -> Optional[str]:
     return None
 
 
-def is_hard_delete(command: str) -> bool:
-    """Check if command is 'bd delete ... --hard'."""
-    if not re.match(r"^\s*bd\s+delete\b", command):
-        return False
-    return "--hard" in command
+def is_delete_command(command: str) -> bool:
+    """Check if command is 'bd delete'."""
+    return bool(re.match(r"^\s*bd\s+delete\b", command))
 
 
 def run_purge_cleanup():
@@ -766,8 +779,8 @@ def handle_post_tool_use(command: str):
             if success:
                 print(f"AUTO: Set {blocked_id} to blocked (dependency created)", file=sys.stderr)
 
-    # Auto-purge after hard delete
-    if is_hard_delete(command):
+    # Auto-purge after delete (we require --hard via PreToolUse anyway)
+    if is_delete_command(command):
         run_purge_cleanup()
 
 
