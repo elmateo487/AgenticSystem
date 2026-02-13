@@ -76,13 +76,18 @@ bd dep remove BLOCKED BLOCKER            # Remove dependency
 
 ### Valid Close Reasons
 
-`bd close` requires `--reason` with canonical wording:
+`bd close` requires `--reason` starting with canonical wording:
 
-**Completion** (exact match, case-insensitive):
+**Completion** (prefix match, case-insensitive - descriptive text allowed after):
 - `Done` - Work completed successfully
 - `Fixed` - Bug was fixed
 - `All ACs complete` - All acceptance criteria met
 - `All tickets complete` - All child tickets closed
+
+Completion reasons can include additional context after the canonical prefix:
+- `Done - All 17 tickets complete, 106 tests implemented`
+- `Fixed: resolved the race condition in parallel execution`
+- `All ACs complete. Full test coverage achieved.`
 
 **Non-completion** (prefix + explanation required):
 - `Won't implement - [why]` - Decision not to do the work
@@ -92,12 +97,18 @@ bd dep remove BLOCKED BLOCKER            # Remove dependency
 Non-completion format: `PREFIX - EXPLANATION` where explanation cannot be empty.
 
 ```bash
-# Valid
+# Valid completion
+--reason "Done"
+--reason "Done - All 17 tickets complete"
+--reason "Fixed: resolved race condition"
+--reason "All ACs complete. 106 tests passing."
+
+# Valid non-completion
 --reason "Won't implement - not needed for MVP"
 --reason "Duplicate - see ticket-123"
 --reason "Out of scope - belongs in phase 2"
 
-# Invalid (missing explanation)
+# Invalid (missing explanation for non-completion)
 --reason "Won't implement"      # ❌ needs "- [why]"
 --reason "Duplicate"            # ❌ needs "- [ref]"
 --reason "Out of scope"         # ❌ needs "- [why]"

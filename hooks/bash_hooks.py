@@ -7,9 +7,10 @@ Combines:
 2. System temp pollution detection for SafeVision
 3. Auto-block on dependency creation
 
-Exit codes:
-  0 = Allow (command may proceed)
-  2 = Block (command rejected with error message on stderr)
+Output format (JSON to stdout):
+  {"decision": "allow"} - command may proceed
+  {"decision": "allow", "additionalContext": "..."} - proceed with context for model
+  {"decision": "block", "reason": "..."} - command rejected
 """
 
 import json
@@ -18,12 +19,27 @@ import re
 import subprocess
 import sys
 from pathlib import Path
-from typing import Optional, Tuple
+from typing import List, Optional, Tuple
 
 
 _HOOK_CWD = None  # Store cwd from stdin for bd commands
 _PROJECT_ROOT = None  # Cached project root (parent of .beads)
 _HOOK_EVENT = None  # PreToolUse or PostToolUse
+
+
+def output_allow(additional_context: Optional[str] = None):
+    """Output allow decision with optional context."""
+    result = {"decision": "allow"}
+    if additional_context:
+        result["additionalContext"] = additional_context
+    print(json.dumps(result))
+    sys.exit(0)
+
+
+def output_block(reason: str):
+    """Output block decision with reason."""
+    print(json.dumps({"decision": "block", "reason": reason}))
+    sys.exit(0)
 
 
 def find_project_root(start_path: str) -> Optional[str]:
@@ -71,6 +87,25 @@ def get_command() -> str:
         return data.get("tool_input", {}).get("command", "")
     except Exception:
         return ""
+
+
+def extract_bd_command(command: str) -> Optional[str]:
+    """Extract the bd subcommand from a compound command.
+
+    Handles cases like:
+    - "bd delete foo" -> "bd delete foo"
+    - "source .venv/bin/activate && bd delete foo" -> "bd delete foo"
+    - "cd /tmp && bd create 'test'" -> "bd create 'test'"
+    - "echo hi" -> None (no bd command)
+    """
+    # Split on && and ; to find bd commands
+    # This is a simplified parser - won't handle all edge cases but covers common patterns
+    parts = re.split(r'\s*(?:&&|;)\s*', command)
+    for part in parts:
+        part = part.strip()
+        if re.match(r'^\s*bd\s+', part):
+            return part
+    return None
 
 
 # =============================================================================
@@ -226,15 +261,20 @@ def is_valid_close_reason(reason: str) -> Tuple[bool, str]:
 
 def check_bd_command_guard(command: str) -> Optional[str]:
     """Validate bd commands. Returns error message if blocked, None otherwise."""
+    # Extract bd subcommand from compound commands (e.g., "source .venv && bd delete foo")
+    bd_cmd = extract_bd_command(command)
+    if not bd_cmd:
+        return None  # No bd command found
+
     # Block: bd ready
-    if re.match(r"^\s*bd\s+ready\b", command):
+    if re.match(r"^\s*bd\s+ready\b", bd_cmd):
         return "BLOCKED: `bd ready` is not permitted\nOnly humans choose what work to execute next."
 
     # Block: bd delete without --hard --force, and require --cascade if has children
-    if re.match(r"^\s*bd\s+delete\b", command):
-        has_hard = "--hard" in command
-        has_force = "--force" in command
-        has_cascade = "--cascade" in command
+    if re.match(r"^\s*bd\s+delete\b", bd_cmd):
+        has_hard = "--hard" in bd_cmd
+        has_force = "--force" in bd_cmd
+        has_cascade = "--cascade" in bd_cmd
 
         # Check required flags
         if not has_hard or not has_force:
@@ -247,7 +287,7 @@ def check_bd_command_guard(command: str) -> Optional[str]:
 
         # Check for children - require --cascade if any exist
         if not has_cascade:
-            issue_id = parse_issue_id_from_command(command, "delete")
+            issue_id = parse_issue_id_from_command(bd_cmd, "delete")
             if issue_id:
                 children = get_issue_children(issue_id)
                 if children:
@@ -258,11 +298,11 @@ def check_bd_command_guard(command: str) -> Optional[str]:
                     )
 
     # Block: bd update --status validations
-    if re.match(r"^\s*bd\s+update\b", command):
-        status_match = re.search(r"(?:-s|--status)\s+(\S+)", command)
+    if re.match(r"^\s*bd\s+update\b", bd_cmd):
+        status_match = re.search(r"(?:-s|--status)\s+(\S+)", bd_cmd)
         if status_match:
             new_status = status_match.group(1).lower()
-            issue_id = parse_issue_id_from_command(command, "update")
+            issue_id = parse_issue_id_from_command(bd_cmd, "update")
 
             # Check 1: Valid status values only
             if new_status not in VALID_STATUSES:
@@ -294,7 +334,7 @@ def check_bd_command_guard(command: str) -> Optional[str]:
             if new_status in ("open", "in_progress") and issue_id:
                 current_status = get_issue_status(issue_id)
                 if current_status == "blocked":
-                    has_comment = has_comment_flag(command)
+                    has_comment = has_comment_flag(bd_cmd)
                     if not has_comment:
                         return (
                             "BLOCKED: Unblocking requires explanation\n"
@@ -303,13 +343,13 @@ def check_bd_command_guard(command: str) -> Optional[str]:
                         )
 
     # Block: bd close without --reason or with invalid reason
-    if re.match(r"^\s*bd\s+close\b", command):
+    if re.match(r"^\s*bd\s+close\b", bd_cmd):
         # Try double-quoted reason first, then single-quoted, then unquoted
-        reason_match = re.search(r'(?:-r|--reason)\s+"([^"]+)"', command)
+        reason_match = re.search(r'(?:-r|--reason)\s+"([^"]+)"', bd_cmd)
         if not reason_match:
-            reason_match = re.search(r"(?:-r|--reason)\s+'([^']+)'", command)
+            reason_match = re.search(r"(?:-r|--reason)\s+'([^']+)'", bd_cmd)
         if not reason_match:
-            reason_match = re.search(r"(?:-r|--reason)\s+(\S+)", command)
+            reason_match = re.search(r"(?:-r|--reason)\s+(\S+)", bd_cmd)
 
         if not reason_match:
             return (
@@ -324,13 +364,13 @@ def check_bd_command_guard(command: str) -> Optional[str]:
             return f'BLOCKED: Invalid close reason "{reason}"\n{suggestion}'
 
     # Block: bd create validations
-    if re.match(r"^\s*bd\s+create\b", command):
+    if re.match(r"^\s*bd\s+create\b", bd_cmd):
         # Check 1: Epic label requires --type epic
-        if has_epic_label(command) and not has_epic_type(command):
+        if has_epic_label(bd_cmd) and not has_epic_type(bd_cmd):
             return 'BLOCKED: Epic creation misconfigured\nYou specified --label \'type:epic\' but did not set --type epic.\nUsage: bd create "Title" --label "type:epic" --type epic'
 
         # Check 2: Require type label (epic, ticket, ac, or research)
-        type_label = has_any_type_label(command)
+        type_label = has_any_type_label(bd_cmd)
         if not type_label:
             return (
                 'BLOCKED: `bd create` requires a type label\n'
@@ -340,7 +380,7 @@ def check_bd_command_guard(command: str) -> Optional[str]:
 
         # Check 3: AC must have --parent
         if type_label == "ac":
-            parent_id = has_parent_flag(command)
+            parent_id = has_parent_flag(bd_cmd)
             if not parent_id:
                 return (
                     'BLOCKED: AC (type:ac) must have a parent ticket\n'
@@ -366,7 +406,7 @@ def check_bd_command_guard(command: str) -> Optional[str]:
 
         # Check 6: Ticket parent (if specified) must be epic, not AC
         if type_label == "ticket":
-            parent_id = has_parent_flag(command)
+            parent_id = has_parent_flag(bd_cmd)
             if parent_id:
                 parent_type = get_issue_type_label(parent_id)
                 if parent_type == "ac":
@@ -395,13 +435,14 @@ NON_COMPLETION_PATTERNS = ["won't implement", "wont implement", "duplicate", "ou
 
 def parse_bd_close(command: str) -> Tuple[Optional[str], Optional[str]]:
     """Parse bd close command. Returns (issue_id, reason) or (None, None)."""
-    if not re.match(r"^\s*bd\s+close\b", command):
+    bd_cmd = extract_bd_command(command)
+    if not bd_cmd or not re.match(r"^\s*bd\s+close\b", bd_cmd):
         return None, None
-    reason_match = re.search(r'(?:-r|--reason)\s+["\']([^"\']+)["\']', command)
+    reason_match = re.search(r'(?:-r|--reason)\s+["\']([^"\']+)["\']', bd_cmd)
     if not reason_match:
-        reason_match = re.search(r"(?:-r|--reason)\s+(\S+)", command)
+        reason_match = re.search(r"(?:-r|--reason)\s+(\S+)", bd_cmd)
     reason = reason_match.group(1) if reason_match else None
-    cmd_without_reason = re.sub(r'(?:-r|--reason)\s+(?:"[^"]*"|\'[^\']*\'|\S+)', "", command)
+    cmd_without_reason = re.sub(r'(?:-r|--reason)\s+(?:"[^"]*"|\'[^\']*\'|\S+)', "", bd_cmd)
     parts = cmd_without_reason.split()
     issue_id = None
     for i, part in enumerate(parts):
@@ -413,13 +454,14 @@ def parse_bd_close(command: str) -> Tuple[Optional[str], Optional[str]]:
 
 def parse_bd_update(command: str) -> Tuple[Optional[str], Optional[str]]:
     """Parse bd update command. Returns (issue_id, status) or (None, None)."""
-    if not re.match(r"^\s*bd\s+update\b", command):
+    bd_cmd = extract_bd_command(command)
+    if not bd_cmd or not re.match(r"^\s*bd\s+update\b", bd_cmd):
         return None, None
-    status_match = re.search(r"(?:-s|--status)\s+(\S+)", command)
+    status_match = re.search(r"(?:-s|--status)\s+(\S+)", bd_cmd)
     if not status_match:
         return None, None
     status = status_match.group(1)
-    cmd_without_status = re.sub(r"(?:-s|--status)\s+\S+", "", command)
+    cmd_without_status = re.sub(r"(?:-s|--status)\s+\S+", "", bd_cmd)
     parts = cmd_without_status.split()
     issue_id = None
     for i, part in enumerate(parts):
@@ -746,10 +788,11 @@ def check_system_temp(command: str) -> Optional[str]:
 
 def parse_bd_dep_blocks(command: str) -> Optional[str]:
     """Parse 'bd dep X --blocks Y' command. Returns blocked issue ID (Y) or None."""
-    if not re.match(r"^\s*bd\s+dep\b", command):
+    bd_cmd = extract_bd_command(command)
+    if not bd_cmd or not re.match(r"^\s*bd\s+dep\b", bd_cmd):
         return None
     # Match --blocks or -b flag
-    blocks_match = re.search(r'(?:--blocks|-b)\s+(\S+)', command)
+    blocks_match = re.search(r'(?:--blocks|-b)\s+(\S+)', bd_cmd)
     if blocks_match:
         return blocks_match.group(1)
     return None
@@ -757,7 +800,8 @@ def parse_bd_dep_blocks(command: str) -> Optional[str]:
 
 def is_delete_command(command: str) -> bool:
     """Check if command is 'bd delete'."""
-    return bool(re.match(r"^\s*bd\s+delete\b", command))
+    bd_cmd = extract_bd_command(command)
+    return bool(bd_cmd and re.match(r"^\s*bd\s+delete\b", bd_cmd))
 
 
 def run_purge_cleanup():
@@ -790,38 +834,43 @@ def handle_post_tool_use(command: str):
 
 
 def main():
-    command = get_command()
-    if not command:
-        sys.exit(0)
+    try:
+        command = get_command()
+        if not command:
+            output_allow()
 
-    # PostToolUse: handle auto-actions after command completes
-    if _HOOK_EVENT == "PostToolUse":
-        if re.match(r"^\s*bd\s+", command):
-            handle_post_tool_use(command)
-        sys.exit(0)
+        # Check if command contains a bd subcommand
+        bd_cmd = extract_bd_command(command)
 
-    # PreToolUse: validation and guards
-    # Check beads commands
-    if re.match(r"^\s*bd\s+", command):
-        # Command guard
-        error = check_bd_command_guard(command)
+        # PostToolUse: handle auto-actions after command completes
+        if _HOOK_EVENT == "PostToolUse":
+            if bd_cmd:
+                handle_post_tool_use(command)
+            output_allow()
+
+        # PreToolUse: validation and guards
+        # Check beads commands
+        if bd_cmd:
+            # Command guard
+            error = check_bd_command_guard(command)
+            if error:
+                output_block(error)
+
+            # Status propagation (may block)
+            error = handle_bd_status_propagation(command)
+            if error:
+                output_block(error)
+
+        # Check system temp pollution
+        error = check_system_temp(command)
         if error:
-            print(error, file=sys.stderr)
-            sys.exit(2)
+            output_block(error)
 
-        # Status propagation (may print info to stderr, may block)
-        error = handle_bd_status_propagation(command)
-        if error:
-            print(error, file=sys.stderr)
-            sys.exit(2)
-
-    # Check system temp pollution
-    error = check_system_temp(command)
-    if error:
-        print(error, file=sys.stderr)
-        sys.exit(2)
-
-    sys.exit(0)
+        output_allow()
+    except Exception:
+        # On any error, allow the command to proceed
+        print(json.dumps({"decision": "allow"}))
+        sys.exit(0)
 
 
 if __name__ == "__main__":

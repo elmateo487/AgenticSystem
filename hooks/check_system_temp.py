@@ -5,15 +5,27 @@ Claude Code PreToolUse hook to detect system temp pollution.
 Blocks commands that would create SafeVision-related temp files in system
 directories (/tmp, /private/tmp, /var, /private/var).
 
-Exit codes:
-  0 = Allow (command may proceed)
-  2 = Block (message on stderr)
+Output format (JSON to stdout):
+  {"decision": "allow"} - command may proceed
+  {"decision": "block", "reason": "..."} - command rejected
 """
 
 import json
 import re
 import sys
 from typing import Optional, Tuple
+
+
+def output_allow():
+    """Output allow decision."""
+    print(json.dumps({"decision": "allow"}))
+    sys.exit(0)
+
+
+def output_block(reason: str):
+    """Output block decision with reason."""
+    print(json.dumps({"decision": "block", "reason": reason}))
+    sys.exit(0)
 
 # System temp paths that should not be used for SafeVision files
 SYSTEM_TEMP_PATTERNS = [
@@ -122,17 +134,12 @@ def check_command(command: str) -> Tuple[bool, str]:
 def main():
     command = get_command()
 
-    # Debug: log what command was received
-    with open("/tmp/check_system_temp_debug.log", "a") as f:
-        f.write(f"Command received: {repr(command)}\n")
-
     should_block, message = check_command(command)
 
     if should_block:
-        print(message, file=sys.stderr)
-        sys.exit(2)
+        output_block(message)
 
-    sys.exit(0)
+    output_allow()
 
 
 if __name__ == "__main__":

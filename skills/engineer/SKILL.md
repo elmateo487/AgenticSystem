@@ -38,15 +38,36 @@ Status propagates UP automatically via hooks.
 
 ### Single Ticket
 1. `bd update <TICKET> --status in_progress`
-2. For each AC: `bd close <AC> --reason "Done"`
-3. `bd close <TICKET> --reason "All ACs complete"`
+2. For each AC: `bd close <AC> --reason "Done - <what was implemented, tested, key details>"`
+3. `bd close <TICKET> --reason "All ACs complete - <files modified, test results, implementation details>"`
 
 ### Epic Mode
 1. For each ticket (priority order):
    - `bd update <TICKET> --status in_progress`
-   - For each AC: `bd close <AC> --reason "Done"`
-   - `bd close <TICKET> --reason "All ACs complete"`
+   - For each AC: `bd close <AC> --reason "Done - <what was implemented, tested, key details>"`
+   - `bd close <TICKET> --reason "All ACs complete - <files modified, test results, implementation details>"`
 2. `bd update <EPIC> --status pending_approval`
+
+## Close Reason Requirements
+
+Close reasons are **permanent documentation** of work completed. They must:
+1. **Start with a canonical prefix** (enforced by hooks): `Done`, `Fixed`, `All ACs complete`, `All tickets complete`
+2. **Include meaningful description** after the prefix
+
+**Required content (after prefix):**
+- What was implemented (specific changes, not generic descriptions)
+- What was tested (test file names, number of tests, pass/fail status)
+- Key technical details (algorithms used, files created, dependencies added)
+
+**Bad examples (too brief - provide context!):**
+- `--reason "Done"` ← technically valid but lacks context
+- `--reason "All ACs complete"` ← missing implementation details
+- `--reason "Implemented feature"` ← rejected by hook (no canonical prefix)
+
+**Good examples:**
+- `--reason "Done - Created AudioTimestampGenerator supporting EAC3/AAC/DTS/TrueHD codecs with mathematical frame timing. 45 unit tests in test_audio_timestamp_generator.py, all passing."`
+- `--reason "Fixed: Removed aresample=async=1 from eac3_muter_improved.py:363. Verified filter not present in FFmpeg command construction. 3 regression tests added."`
+- `--reason "All ACs complete. 106 E2E tests implemented covering 9 pipeline stages with real video artifacts."`
 
 ## Beads Commands
 
